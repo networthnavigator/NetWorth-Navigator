@@ -1,0 +1,95 @@
+{
+  "Accounts": [
+    {
+      "Name": "ING Huishoudpot",
+      "CurrentBalance": 913.34,
+      "Currency": "EUR",
+      "SortOrder": 1
+    },
+    {
+      "Name": "ING Vaste kosten rekening",
+      "CurrentBalance": 8831.91,
+      "Currency": "EUR",
+      "SortOrder": 2
+    }
+  ],
+  "InvestmentAccounts": [
+    {
+      "Name": "ING Zelf Beleggen",
+      "CurrentBalance": 63156.07,
+      "Currency": "EUR",
+      "SortOrder": 1
+    },
+    {
+      "Name": "Door ING beheerd",
+      "CurrentBalance": 21505.97,
+      "Currency": "EUR",
+      "SortOrder": 2
+    }
+  ],
+  "Properties": [
+    {
+      "Name": "huis",
+      "PurchaseValue": 700000.0,
+      "Currency": "EUR",
+      "SortOrder": 1
+    }
+  ],
+  "Mortgages": [
+    {
+      "Name": "2017 deel 1.0",
+      "StartValue": 142000.0,
+      "InterestStartDate": "2017-12-05T00:00:00",
+      "TermYears": 30,
+      "CurrentInterestRate": 1.59,
+      "FixedRatePeriodYears": 10,
+      "IsPaidOff": false,
+      "Currency": "EUR",
+      "SortOrder": 1
+    },
+    {
+      "Name": "2017 deel 1.1",
+      "StartValue": 120000.0,
+      "InterestStartDate": "2017-12-05T00:00:00",
+      "TermYears": 30,
+      "CurrentInterestRate": 1.44,
+      "FixedRatePeriodYears": 10,
+      "IsPaidOff": false,
+      "Currency": "EUR",
+      "SortOrder": 2
+    },
+    {
+      "Name": "2017 deel 2.0",
+      "StartValue": 50000.0,
+      "InterestStartDate": "2017-12-05T00:00:00",
+      "TermYears": 30,
+      "CurrentInterestRate": 1.99,
+      "FixedRatePeriodYears": 10,
+      "IsPaidOff": true,
+      "Currency": "EUR",
+      "SortOrder": 3
+    },
+    {
+      "Name": "Camper",
+      "StartValue": 100000.0,
+      "InterestStartDate": "2021-06-11T00:00:00",
+      "TermYears": 30,
+      "CurrentInterestRate": 0.95,
+      "FixedRatePeriodYears": 10,
+      "IsPaidOff": false,
+      "Currency": "EUR",
+      "SortOrder": 4
+    },
+    {
+      "Name": "Auto & Caravan",
+      "StartValue": 72100.0,
+      "InterestStartDate": "2025-12-10T00:00:00",
+      "TermYears": 30,
+      "CurrentInterestRate": 0.0,
+      "FixedRatePeriodYears": 1,
+      "IsPaidOff": false,
+      "Currency": "EUR",
+      "SortOrder": 5
+    }
+  ]
+}

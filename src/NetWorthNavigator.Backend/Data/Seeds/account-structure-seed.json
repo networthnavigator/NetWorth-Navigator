@@ -1,0 +1,105 @@
+[
+  {
+    "code": "1",
+    "name": "Assets",
+    "children": [
+      {
+        "code": "11",
+        "name": "Non-current assets",
+        "children": [
+          { "code": "111", "name": "Property, plant and equipment" },
+          { "code": "112", "name": "Intangible assets" },
+          { "code": "113", "name": "Financial assets (investments)" }
+        ]
+      },
+      {
+        "code": "12",
+        "name": "Current assets",
+        "children": [
+          { "code": "121", "name": "Inventories" },
+          { "code": "122", "name": "Trade and other receivables" },
+          { "code": "123", "name": "Cash and cash equivalents" }
+        ]
+      }
+    ]
+  },
+  {
+    "code": "2",
+    "name": "Liabilities",
+    "children": [
+      {
+        "code": "21",
+        "name": "Non-current liabilities",
+        "children": [
+          { "code": "211", "name": "Borrowings" },
+          { "code": "212", "name": "Provisions" }
+        ]
+      },
+      {
+        "code": "22",
+        "name": "Current liabilities",
+        "children": [
+          { "code": "221", "name": "Trade and other payables" },
+          { "code": "222", "name": "Current tax" }
+        ]
+      }
+    ]
+  },
+  {
+    "code": "3",
+    "name": "Equity",
+    "children": [
+      {
+        "code": "31",
+        "name": "Equity",
+        "children": [
+          { "code": "311", "name": "Share capital" },
+          { "code": "312", "name": "Reserves" },
+          { "code": "313", "name": "Retained earnings" }
+        ]
+      }
+    ]
+  },
+  {
+    "code": "4",
+    "name": "Revenue",
+    "children": [
+      {
+        "code": "41",
+        "name": "Revenue",
+        "children": [
+          { "code": "411", "name": "Operating income" },
+          { "code": "412", "name": "Other income" }
+        ]
+      }
+    ]
+  },
+  {
+    "code": "5",
+    "name": "Expenses",
+    "children": [
+      {
+        "code": "51",
+        "name": "Expenses",
+        "children": [
+          { "code": "511", "name": "Operating expenses" },
+          { "code": "512", "name": "Other expenses" }
+        ]
+      }
+    ]
+  },
+  {
+    "code": "9",
+    "name": "Suspense and control",
+    "children": [
+      {
+        "code": "91",
+        "name": "Control accounts",
+        "children": [
+          { "code": "911", "name": "Clearing and suspense" },
+          { "code": "912", "name": "Opening balance" }
+        ]
+      }
+    ]
+  }
+]

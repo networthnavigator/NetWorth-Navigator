@@ -1,0 +1,59 @@
+html {
+  font-size: 16px;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: #fafafa;
+  color: #212121;
+}
+
+// Override Material typography
+.mat-mdc-form-field,
+.mat-mdc-button,
+.mat-mdc-card {
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+}
+
+// Dark theme: improve contrast for Purple & Green and other dark themes
+html.theme-dark {
+  color-scheme: dark;
+  // Card content – ensure readable text
+  .mat-mdc-card .mat-mdc-card-title,
+  .mat-mdc-card .mat-mdc-card-content {
+    color: rgba(255, 255, 255, 0.95) !important;
+  }
+  // Rekening schema: tree text was #444/#666 (invisible on dark bg)
+  app-tree-node .level4,
+  app-tree-node .rekening-code {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+  app-tree-node .rekening-code {
+    opacity: 0.95;
+  }
+  // Icon buttons in tree (edit, delete) – ensure visible
+  app-tree-node .node-actions button,
+  app-tree-node .node-actions .material-symbols-outlined {
+    color: rgba(255, 255, 255, 0.87) !important;
+  }
+  app-tree-node .node-actions button:hover {
+    color: var(--mat-sys-tertiary, #69f0ae) !important;
+  }
+  // Stroked/outlined buttons (Vul schema, Nieuwe categorie)
+  app-rekening-schema .mat-mdc-button.mat-mdc-outlined-button {
+    color: rgba(255, 255, 255, 0.87) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
+  }
+  app-rekening-schema .mat-mdc-button.mat-mdc-outlined-button .material-symbols-outlined {
+    color: inherit !important;
+  }
+  app-rekening-schema .mat-mdc-button.mat-mdc-outlined-button:hover {
+    color: var(--mat-sys-tertiary, #69f0ae) !important;
+    border-color: color-mix(in srgb, var(--mat-sys-tertiary, #69f0ae) 50%, transparent) !important;
+  }
+}

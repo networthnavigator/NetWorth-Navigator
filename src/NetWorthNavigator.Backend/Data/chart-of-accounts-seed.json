@@ -1,0 +1,169 @@
+[
+  {"code":"1","name":"Assets","children":[
+    {"code":"11","name":"Fixed assets","children":[
+      {"code":"111","name":"Buildings","children":[
+        {"code":"1","name":"Assterstraat 39","rekeningCode":"0011"},
+        {"code":"2","name":"Parnassia 13","rekeningCode":"0012"}
+      ]}
+    ]},
+    {"code":"12","name":"Current assets","children":[
+      {"code":"121","name":"Cash","children":[
+        {"code":"1","name":"Cash kluis","rekeningCode":"1001"},
+        {"code":"2","name":"Cash Ewout","rekeningCode":"1002"},
+        {"code":"3","name":"Cash Nelleke","rekeningCode":"1003"}
+      ]},
+      {"code":"122","name":"Bank","children":[
+        {"code":"0","name":"Current accounts","children":[
+          {"code":"1","name":"NL76 INGB 0755 7120 72","rekeningCode":"1101"},
+          {"code":"2","name":"NL58 INGB 0005 9348 91","rekeningCode":"1102"}
+        ]},
+        {"code":"1","name":"Savings accounts","children":[
+          {"code":"1","name":"Spaarrekening Sofie","rekeningCode":"1111"},
+          {"code":"2","name":"Spaarrekening Nikki","rekeningCode":"1112"}
+        ]},
+        {"code":"2","name":"Credit accounts","children":[
+          {"code":"1","name":"Creditcard ING 5248 8610 0680 3338","rekeningCode":"1121"}
+        ]},
+        {"code":"9","name":"Savings goals","children":[
+          {"code":"1","name":"Vaste reserve 15k - K16502755","rekeningCode":"1191"},
+          {"code":"9","name":"Diverse spaarpotjes","rekeningCode":"1199"}
+        ]}
+      ]},
+      {"code":"123","name":"Receivables","children":[
+        {"code":"0","name":"Loans to third parties","children":[
+          {"code":"1","name":"Lening G&L 2015","rekeningCode":"1301"}
+        ]}
+      ]}
+    ]}
+  ]},
+  {"code":"2","name":"Liabilities","children":[
+    {"code":"21","name":"Provisions","children":[
+      {"code":"211","name":"Reserves","children":[
+        {"code":"1","name":"Reservering vakantie","rekeningCode":"0601"},
+        {"code":"2","name":"Visvakantie Noorwegen","rekeningCode":"0602"}
+      ]}
+    ]},
+    {"code":"22","name":"Long-term debt","children":[
+      {"code":"221","name":"Loans","children":[
+        {"code":"1","name":"Lening Mart en Nel","rekeningCode":"0761"}
+      ]},
+      {"code":"222","name":"Mortgage","children":[
+        {"code":"1","name":"Asserstr. Afl.vrije hypotheek 150k","rekeningCode":"0771"},
+        {"code":"2","name":"Asserstr. Banksparen 150k","rekeningCode":"0772"},
+        {"code":"3","name":"Parnassia deel 1.1 annuïtair 142k","rekeningCode":"0773"},
+        {"code":"4","name":"Parnassia deel 1.2 annuïtair 120k","rekeningCode":"0774"},
+        {"code":"5","name":"Parnassia deel 2  afl.vrij 50k","rekeningCode":"0775"},
+        {"code":"6","name":"Camper","rekeningCode":"0776"}
+      ]}
+    ]}
+  ]},
+  {"code":"3","name":"Equity","children":[
+    {"code":"31","name":"Shares","children":[
+      {"code":"1","name":"ING beleggen kas","rekeningCode":"0411"},
+      {"code":"2","name":"ING portefeuille","rekeningCode":"0412"},
+      {"code":"3","name":"DeGiro kas","rekeningCode":"0413"},
+      {"code":"4","name":"DeGiro portefeuille","rekeningCode":"0414"},
+      {"code":"5","name":"Coinbase","rekeningCode":"0415"}
+    ]}
+  ]},
+  {"code":"4","name":"Income","children":[
+    {"code":"41","name":"Employment income","children":[
+      {"code":"411","name":"Salary","children":[
+        {"code":"1","name":"Salaris","rekeningCode":"8001"},
+        {"code":"9","name":"Salaris overig","rekeningCode":"8009"}
+      ]}
+    ]},
+    {"code":"42","name":"Tax refunds & benefits","children":[
+      {"code":"421","name":"Taxes","children":[
+        {"code":"1","name":"Belastingteruggave","rekeningCode":"8011"},
+        {"code":"2","name":"Kinderbijslag","rekeningCode":"8012"}
+      ]}
+    ]},
+    {"code":"43","name":"Investment income","children":[
+      {"code":"431","name":"Shares","children":[
+        {"code":"1","name":"Belegginsresultaat","rekeningCode":"8411"}
+      ]},
+      {"code":"432","name":"Mortgage","children":[
+        {"code":"1","name":"Rente banksparen","rekeningCode":"8421"}
+      ]}
+    ]},
+    {"code":"44","name":"Property","children":[
+      {"code":"441","name":"Buildings","children":[
+        {"code":"1","name":"Waarde wijzigingen","rekeningCode":"8111"}
+      ]}
+    ]},
+    {"code":"49","name":"Other income","children":[
+        {"code":"9","name":"Opbrengsten overig","rekeningCode":"8099"}
+    ]}
+  ]},
+  {"code":"5","name":"Expenses","children":[
+    {"code":"51","name":"Housing","children":[
+        {"code":"1","name":"Hypotheek","rekeningCode":"4001"},
+        {"code":"2","name":"TV, internet & telefonie","rekeningCode":"4002"},
+        {"code":"3","name":"Energie & water","rekeningCode":"4003"},
+        {"code":"4","name":"Verzekeringen","rekeningCode":"4004"},
+        {"code":"5","name":"Belastingen","rekeningCode":"4005"}
+      ]},
+    {"code":"52","name":"Home & garden","children":[
+        {"code":"1","name":"Onderhoud","rekeningCode":"4011"},
+        {"code":"2","name":"Inrichting","rekeningCode":"4012"},
+        {"code":"3","name":"Tuin","rekeningCode":"4013"},
+        {"code":"9","name":"Huis & tuin overig","rekeningCode":"4019"}
+      ]},
+    {"code":"53","name":"Food & drinks","children":[
+        {"code":"1","name":"Boodschappen","rekeningCode":"4021"},
+        {"code":"2","name":"Buiten de deur","rekeningCode":"4022"},
+        {"code":"3","name":"Healthy / suplementen","rekeningCode":"4023"}
+      ]},
+    {"code":"54","name":"Health","children":[
+        {"code":"1","name":"Verzekeringen","rekeningCode":"4031"},
+        {"code":"2","name":"Zorgkosten","rekeningCode":"4032"}
+      ]},
+    {"code":"55","name":"Transport","children":[
+        {"code":"1","name":"Auto vast","rekeningCode":"4041"},
+        {"code":"2","name":"Auto brandstof","rekeningCode":"4042"},
+        {"code":"3","name":"Auto overig","rekeningCode":"4043"},
+        {"code":"4","name":"Openbaar vervoer","rekeningCode":"4044"},
+        {"code":"5","name":"Fiets & onderhoud","rekeningCode":"4045"}
+      ]},
+    {"code":"56","name":"Hobby & leisure","children":[
+        {"code":"1","name":"Vakantie","rekeningCode":"4051"},
+        {"code":"2","name":"Uitjes","rekeningCode":"4052"},
+        {"code":"3","name":"Sport/vereniging","rekeningCode":"4053"},
+        {"code":"4","name":"Op stap met derden","rekeningCode":"4054"},
+        {"code":"5","name":"Digitale abbonementen","rekeningCode":"4055"},
+        {"code":"9","name":"Hobby & vrije tijd overig","rekeningCode":"4059"}
+      ]},
+    {"code":"57","name":"Shopping","children":[
+        {"code":"1","name":"Kleding & accesoires","rekeningCode":"4061"},
+        {"code":"2","name":"Cadeaus gezin","rekeningCode":"4062"},
+        {"code":"3","name":"Cadeaus derden","rekeningCode":"4063"},
+        {"code":"4","name":"Electronica","rekeningCode":"4064"},
+        {"code":"5","name":"Apps/gaming","rekeningCode":"4065"},
+        {"code":"9","name":"Winkelen overig","rekeningCode":"4069"}
+      ]},
+    {"code":"58","name":"Personal care","children":[
+        {"code":"1","name":"Kapper","rekeningCode":"4071"},
+        {"code":"2","name":"Schoonheidsspecialist","rekeningCode":"4072"},
+        {"code":"3","name":"Verzorgingsproducten","rekeningCode":"4073"}
+      ]},
+    {"code":"59","name":"Other expenses","children":[
+        {"code":"1","name":"Educatie","rekeningCode":"4091"},
+        {"code":"2","name":"Bankkosten","rekeningCode":"4092"},
+        {"code":"3","name":"Kas- en koersverschillen","rekeningCode":"4093"},
+        {"code":"4","name":"Mobiele telefonie","rekeningCode":"4094"},
+        {"code":"5","name":"Kansspelen","rekeningCode":"4095"},
+        {"code":"6","name":"Giften","rekeningCode":"4096"},
+        {"code":"7","name":"Huisdieren","rekeningCode":"4097"},
+        {"code":"9","name":"Overig","rekeningCode":"4099"}
+      ]}
+  ]},
+  {"code":"9","name":"Suspense","children":[
+    {"code":"91","name":"Clearing","children":[
+        {"code":"1","name":"Retourbetaling verwacht","rekeningCode":"2001"},
+        {"code":"2","name":"Uitzoekposten","rekeningCode":"2002"},
+        {"code":"3","name":"Posten werk E","rekeningCode":"2003"},
+        {"code":"9","name":"Startsaldo","rekeningCode":"2009"}
+      ]}
+  ]}
+]

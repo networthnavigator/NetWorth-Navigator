@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
+
+# Angular
+node_modules/
+dist/
+.angular/
+*.tsbuildinfo
+
+# IDE
+.vs/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "NetWorth Navigator"
+    },
+    {
+      "path": "src/NetWorthNavigator.Backend",
+      "name": "Backend"
+    },
+    {
+      "path": "src/NetWorthNavigator.Frontend",
+      "name": "Frontend"
+    }
+  ],
+  "settings": {}
+}
