@@ -204,9 +204,23 @@ public class CsvImportService
         var now = DateTime.UtcNow;
         var user = "User";
 
-        // Dedup key = ExternalId when provided by bank, otherwise Hash. Load all existing keys from DB.
-        var existingKeyList = await _context.BankTransactionsHeaders
-            .Select(h => h.ExternalId != null ? h.ExternalId : h.Hash)
+        // Header/line model: one document per file, N lines per document.
+        var doc = new TransactionDocument
+        {
+            Id = Guid.NewGuid(),
+            SourceType = string.IsNullOrWhiteSpace(config.BankId) ? "Bank" : config.BankId,
+            SourceName = fileName,
+            UploadedAt = now,
+            CreatedByUser = user,
+            CreatedByProcess = "Upload",
+            ConfigurationId = config.Id,
+            Status = "Imported",
+        };
+        _context.TransactionDocuments.Add(doc);
+
+        // Dedup key = ExternalId when provided, otherwise Hash. Load existing keys from all document lines.
+        var existingKeyList = await _context.TransactionDocumentLines
+            .Select(l => l.ExternalId != null ? l.ExternalId : l.Hash)
             .ToListAsync(ct);
         var existingKeys = new HashSet<string>(existingKeyList, StringComparer.OrdinalIgnoreCase);
 
@@ -216,9 +230,9 @@ public class CsvImportService
         foreach (var line in dataLines)
         {
             var row = LineToRow(line, config.Delimiter, headerNames);
-            var header = MapToBankTransactionsHeader(config, row, fileName, now, user, line);
-            if (header == null) { skippedInvalid++; continue; }
-            var key = header.ExternalId ?? header.Hash;
+            var documentLine = MapToTransactionDocumentLine(config, row, doc.Id, 0, now, user, line);
+            if (documentLine == null) { skippedInvalid++; continue; }
+            var key = documentLine.ExternalId ?? documentLine.Hash;
             lineEntries.Add((key, line));
         }
 
@@ -228,13 +242,12 @@ public class CsvImportService
 
         var imported = 0;
         var skipped = skippedInvalid;
+        var lineNumber = 0;
 
         foreach (var (key, line) in lineEntries)
         {
             try
             {
-                // Skip only when key already in DB and this key appears just once in the file.
-                // When the same key appears multiple times in the file, add all (e.g. bank sends duplicates).
                 if (existingKeys.Contains(key) && keyCountInFile[key] <= 1)
                 {
                     skipped++;
@@ -242,12 +255,13 @@ public class CsvImportService
                 }
 
                 var row = LineToRow(line, config.Delimiter, headerNames);
-                var header = MapToBankTransactionsHeader(config, row, fileName, now, user, line);
-                if (header == null) { skipped++; continue; }
+                var documentLine = MapToTransactionDocumentLine(config, row, doc.Id, lineNumber, now, user, line);
+                if (documentLine == null) { skipped++; continue; }
 
-                _context.BankTransactionsHeaders.Add(header);
+                _context.TransactionDocumentLines.Add(documentLine);
                 existingKeys.Add(key);
                 imported++;
+                lineNumber++;
             }
             catch
             {
@@ -275,10 +289,11 @@ public class CsvImportService
         return mapping != null ? GetValue(row, mapping.FileColumn) ?? "" : "";
     }
 
-    private static BankTransactionsHeader? MapToBankTransactionsHeader(
+    private static TransactionDocumentLine? MapToTransactionDocumentLine(
         UploadConfigurationDto config,
         Dictionary<string, string> row,
-        string fileName,
+        Guid documentId,
+        int lineNumber,
         DateTime now,
         string user,
         string rawLine)
@@ -342,9 +357,11 @@ public class CsvImportService
                 : externalId;
         }
 
-        return new BankTransactionsHeader
+        return new TransactionDocumentLine
         {
             Id = Guid.NewGuid(),
+            DocumentId = documentId,
+            LineNumber = lineNumber,
             Date = date,
             OwnAccount = ownAccount,
             ContraAccount = contraAccount,
@@ -362,7 +379,6 @@ public class CsvImportService
             DateUpdated = now,
             CreatedByUser = user,
             CreatedByProcess = "Upload",
-            SourceName = fileName,
             Status = "Imported",
             Tag = string.IsNullOrEmpty(tag) ? null : tag,
         };

@@ -47,7 +47,7 @@ export interface PropertyEditData {
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>Cancel</button>
-      <button mat-raised-button color="primary" (click)="save()" [disabled]="!form.name?.trim()">Save</button>
+      <button mat-raised-button color="primary" (click)="save()" [disabled]="!form.name.trim()">Save</button>
     </mat-dialog-actions>
   `,
   styles: ['.form { display: flex; flex-direction: column; min-width: 320px; } .full-width { width: 100%; }'],

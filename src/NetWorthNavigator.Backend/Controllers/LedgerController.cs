@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Application.DTOs;
 using NetWorthNavigator.Backend.Application.Services;
 
@@ -58,7 +59,18 @@ public class LedgerController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
-        if (!await _service.DeleteAsync(id, ct)) return NotFound();
-        return NoContent();
+        try
+        {
+            if (!await _service.DeleteAsync(id, ct)) return NotFound();
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { error = "Cannot delete this ledger account: it is still in use (e.g. by balance sheet accounts, bookings or business rules)." });
+        }
     }
 }

@@ -58,7 +58,7 @@ export interface AccountEditData {
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>Cancel</button>
-      <button mat-raised-button color="primary" (click)="save()" [disabled]="!form.name?.trim()">Save</button>
+      <button mat-raised-button color="primary" (click)="save()" [disabled]="!form.name.trim()">Save</button>
     </mat-dialog-actions>
   `,
   styles: [`

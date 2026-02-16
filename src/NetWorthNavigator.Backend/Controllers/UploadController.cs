@@ -12,7 +12,7 @@ public class UploadController : ControllerBase
 
     public UploadController(CsvImportService importService) => _importService = importService;
 
-    /// <summary>GET /api/upload/column-schema - Mappable columns from BankTransactionsHeaders table</summary>
+    /// <summary>GET /api/upload/column-schema - Mappable columns for imported transaction lines</summary>
     [HttpGet("column-schema")]
     [ResponseCache(NoStore = true, Duration = 0)]
     public ActionResult<IEnumerable<object>> GetColumnSchema()

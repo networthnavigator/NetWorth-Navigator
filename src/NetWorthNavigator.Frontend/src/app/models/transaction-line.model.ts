@@ -1,5 +1,8 @@
-export interface BankTransactionsHeader {
+/** One imported transaction line (any source: bank, credit card, brokerage, crypto). */
+export interface TransactionLine {
   id: string;
+  documentId?: string;
+  lineNumber?: number;
   date: string;
   ownAccount: string;
   contraAccount: string;

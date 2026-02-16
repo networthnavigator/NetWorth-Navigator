@@ -5,6 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AccountStructureService } from '../services/account-structure.service';
 import { LedgerService } from '../services/ledger.service';
 import { ChartOfAccountsSeedService } from '../services/ledger.service';
@@ -21,6 +22,7 @@ import { LedgerTableComponent } from './ledger-table.component';
     MatCardModule,
     MatButtonModule,
     MatTooltipModule,
+    MatSnackBarModule,
     MatProgressSpinnerModule,
     AccountStructureTreeComponent,
     LedgerTableComponent,
@@ -89,6 +91,7 @@ export class RekeningSchemaComponent implements OnInit {
   private readonly structureService = inject(AccountStructureService);
   private readonly ledgerService = inject(LedgerService);
   private readonly seedService = inject(ChartOfAccountsSeedService);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly structure = signal<AccountStructure[]>([]);
   readonly ledgerAccounts = signal<LedgerAccount[]>([]);
@@ -123,10 +126,10 @@ export class RekeningSchemaComponent implements OnInit {
     if (!confirm('This will update the seed file with your current ledger accounts. Continue?')) return;
     this.seedService.updateSeedFile().subscribe({
       next: (result) => {
-        alert('Seed file updated successfully: ' + result.path);
+        this.snackBar.open('Seed file updated: ' + result.path, undefined, { duration: 4000 });
       },
       error: (err) => {
-        alert('Error updating seed file: ' + (err?.error?.error || err?.message || 'Unknown error'));
+        this.snackBar.open('Error updating seed file: ' + (err?.error?.error || err?.message || 'Unknown error'), undefined, { duration: 5000 });
       },
     });
   }
@@ -135,11 +138,11 @@ export class RekeningSchemaComponent implements OnInit {
     if (!confirm('This will add ledger accounts from the repository seed file to your existing data. Continue?')) return;
     this.seedService.seed().subscribe({
       next: (result) => {
-        alert('Seeded: ' + result.ledgerAccountsAdded + ' ledger account(s) added.');
+        this.snackBar.open('Seeded: ' + result.ledgerAccountsAdded + ' ledger account(s) added.', undefined, { duration: 4000 });
         this.load();
       },
       error: (err) => {
-        alert('Error seeding data: ' + (err?.error?.error || err?.message || 'Unknown error'));
+        this.snackBar.open('Error seeding data: ' + (err?.error?.error || err?.message || 'Unknown error'), undefined, { duration: 5000 });
       },
     });
   }

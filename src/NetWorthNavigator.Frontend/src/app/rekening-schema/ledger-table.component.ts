@@ -5,6 +5,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LedgerAccount } from '../models/ledger-account.model';
 import { AccountStructureService } from '../services/account-structure.service';
 import { LedgerService } from '../services/ledger.service';
@@ -16,7 +17,7 @@ import {
 @Component({
   selector: 'app-ledger-table',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatTooltipModule, MatTableModule, MatIconModule],
+  imports: [CommonModule, MatButtonModule, MatTooltipModule, MatTableModule, MatIconModule, MatSnackBarModule],
   template: `
     <div class="table-actions">
       <button mat-stroked-button (click)="addAccount()" matTooltip="Add new ledger account">
@@ -63,6 +64,7 @@ import {
 })
 export class LedgerTableComponent {
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
   private readonly accountStructureService = inject(AccountStructureService);
   private readonly ledgerService = inject(LedgerService);
 
@@ -103,8 +105,14 @@ export class LedgerTableComponent {
   deleteAccount(account: LedgerAccount) {
     if (!confirm(`Are you sure you want to delete "${account.name}"?`)) return;
     this.ledgerService.delete(account.id).subscribe({
-      next: () => this.deleted.emit(),
-      error: (e) => console.error('Delete failed', e),
+      next: () => {
+        this.snackBar.open('Ledger account deleted', undefined, { duration: 3000 });
+        this.deleted.emit();
+      },
+      error: (err) => {
+        const msg = err?.error?.error ?? err?.message ?? 'Delete failed';
+        this.snackBar.open(msg, undefined, { duration: 5000 });
+      },
     });
   }
 }

@@ -7,10 +7,8 @@ import { LedgerAccount } from '../models/ledger-account.model';
   providedIn: 'root',
 })
 export class LedgerService {
-  private readonly base =
-    typeof window !== 'undefined' && window.location.port === '4200'
-      ? 'http://localhost:5000/api/ledger'
-      : '/api/ledger';
+  /** Use relative URL so the dev server proxies /api/* to the backend (avoids CORS). */
+  private readonly base = '/api/ledger';
 
   constructor(private http: HttpClient) {}
 
@@ -36,10 +34,7 @@ export class LedgerService {
   }
 }
 
-const CHART_OF_ACCOUNTS_SEED_BASE =
-  typeof window !== 'undefined' && window.location.port === '4200'
-    ? 'http://localhost:5000/api/chart-of-accounts/seed'
-    : '/api/chart-of-accounts/seed';
+const CHART_OF_ACCOUNTS_SEED_BASE = '/api/chart-of-accounts/seed';
 
 @Injectable({ providedIn: 'root' })
 export class ChartOfAccountsSeedService {

@@ -7,11 +7,12 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { forkJoin } from 'rxjs';
 import * as rxjs from 'rxjs';
 import { BalanceSheetAccount, InvestmentAccount, Property, PropertyValuation, Mortgage, AmortizationType } from '../models/assets-liabilities.model';
 import { AssetsLiabilitiesService } from '../services/assets-liabilities.service';
-import { BankTransactionsHeaderService } from '../services/bank-transactions-header.service';
+import { TransactionLinesService } from '../services/transaction-lines.service';
 import { getCurrencySymbol } from '../models/preferences.model';
 import { AccountEditDialogComponent, AccountEditData } from './account-edit-dialog.component';
 import { InvestmentAccountEditDialogComponent, InvestmentAccountEditData } from './investment-account-edit-dialog.component';
@@ -30,6 +31,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
     MatTableModule,
     MatTooltipModule,
     MatCheckboxModule,
+    MatSnackBarModule,
   ],
   template: `
     <div class="page-header">
@@ -86,7 +88,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             <tr class="mat-row" *matNoDataRow><td class="mat-cell" colspan="3">No accounts yet. Add one to get started.</td></tr>
           </table>
 
-          @if (ownAccountsFromTransactions().length > 0) {
+          @if (ownAccountsToAdd().length > 0) {
             <div class="own-accounts-from-transactions">
               <h3 class="own-accounts-title">Accounts from your transactions</h3>
               <p class="own-accounts-hint">These accounts appear in your imported bank data. Add them to track balances.</p>
@@ -101,9 +103,6 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
                   </li>
                 }
               </ul>
-              @if (ownAccountsToAdd().length === 0 && ownAccountsFromTransactions().length > 0) {
-                <p class="own-accounts-all-added">All accounts from your transactions have been added.</p>
-              }
             </div>
           }
         </mat-card-content>
@@ -314,8 +313,9 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
 })
 export class AssetsLiabilitiesComponent implements OnInit {
   private readonly service = inject(AssetsLiabilitiesService);
-  private readonly bankTransactionsService = inject(BankTransactionsHeaderService);
+  private readonly transactionLinesService = inject(TransactionLinesService);
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly accounts = signal<BalanceSheetAccount[]>([]);
   readonly investmentAccounts = signal<InvestmentAccount[]>([]);
@@ -368,7 +368,7 @@ export class AssetsLiabilitiesComponent implements OnInit {
         this.loadPropertyValuations(r.properties);
       },
     });
-    this.bankTransactionsService.getOwnAccounts().subscribe({
+    this.transactionLinesService.getOwnAccounts().subscribe({
       next: (list) => this.ownAccountsFromTransactions.set(list),
       error: () => this.ownAccountsFromTransactions.set([]),
     });
@@ -665,10 +665,10 @@ export class AssetsLiabilitiesComponent implements OnInit {
     if (!confirm('This will update the seed file with your current data. Continue?')) return;
     this.service.updateSeedFile().subscribe({
       next: (result) => {
-        alert('Seed file updated successfully: ' + result.path);
+        this.snackBar.open('Seed file updated: ' + result.path, undefined, { duration: 4000 });
       },
       error: (err) => {
-        alert('Error updating seed file: ' + (err?.error?.error || err?.message || 'Unknown error'));
+        this.snackBar.open('Error updating seed file: ' + (err?.error?.error || err?.message || 'Unknown error'), undefined, { duration: 5000 });
       },
     });
   }
@@ -678,11 +678,11 @@ export class AssetsLiabilitiesComponent implements OnInit {
     this.service.seed().subscribe({
       next: (result) => {
         const msg = `Seeded: ${result.accountsAdded} accounts, ${result.investmentAccountsAdded} investment accounts, ${result.propertiesAdded} properties, ${result.mortgagesAdded} mortgages.`;
-        alert(msg);
+        this.snackBar.open(msg, undefined, { duration: 4000 });
         this.load();
       },
       error: (err) => {
-        alert('Error seeding data: ' + (err?.error?.error || err?.message || 'Unknown error'));
+        this.snackBar.open('Error seeding data: ' + (err?.error?.error || err?.message || 'Unknown error'), undefined, { duration: 5000 });
       },
     });
   }

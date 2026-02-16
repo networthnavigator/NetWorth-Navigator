@@ -8,6 +8,9 @@
     <AssemblyName>NetWorthNavigator.Backend</AssemblyName>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NetWorthNavigator.Backend.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="Data\Seeds\account-structure-seed.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

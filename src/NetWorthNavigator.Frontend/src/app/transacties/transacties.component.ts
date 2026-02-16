@@ -6,17 +6,17 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatExpansionModule } from '@angular/material/expansion';
-import { BankTransactionsHeaderService } from '../services/bank-transactions-header.service';
-import { BankTransactionsHeader } from '../models/bank-transactions-header.model';
+import { TransactionLinesService } from '../services/transaction-lines.service';
+import { TransactionLine } from '../models/transaction-line.model';
 import { getCurrencySymbol } from '../models/preferences.model';
 
 export interface TransactionsByAccount {
   ownAccount: string;
-  transactions: BankTransactionsHeader[];
+  transactions: TransactionLine[];
 }
 
 /** Ordered list of (database field name, label) for the detail panel. */
-const DETAIL_FIELDS: { key: keyof BankTransactionsHeader; label: string }[] = [
+const DETAIL_FIELDS: { key: keyof TransactionLine; label: string }[] = [
   { key: 'id', label: 'id' },
   { key: 'date', label: 'date' },
   { key: 'ownAccount', label: 'ownAccount' },
@@ -178,17 +178,17 @@ const DETAIL_FIELDS: { key: keyof BankTransactionsHeader; label: string }[] = [
   `],
 })
 export class TransactiesComponent implements OnInit {
-  private readonly service = inject(BankTransactionsHeaderService);
+  private readonly service = inject(TransactionLinesService);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly getCurrencySymbol = getCurrencySymbol;
 
   groups: TransactionsByAccount[] = [];
   loading = false;
   displayedColumns: string[] = ['date', 'contraAccount', 'contraAccountName', 'amount'];
-  selectedTransaction: BankTransactionsHeader | null = null;
+  selectedTransaction: TransactionLine | null = null;
   readonly detailFields = DETAIL_FIELDS;
 
-  onRowClick(t: BankTransactionsHeader): void {
+  onRowClick(t: TransactionLine): void {
     if (this.selectedTransaction?.id === t.id) {
       this.selectedTransaction = null;
     } else {
@@ -196,7 +196,7 @@ export class TransactiesComponent implements OnInit {
     }
   }
 
-  isSelected(t: BankTransactionsHeader): boolean {
+  isSelected(t: TransactionLine): boolean {
     return this.selectedTransaction?.id === t.id;
   }
 
@@ -204,7 +204,7 @@ export class TransactiesComponent implements OnInit {
     this.selectedTransaction = null;
   }
 
-  formatDetailValue(t: BankTransactionsHeader, key: keyof BankTransactionsHeader): string {
+  formatDetailValue(t: TransactionLine, key: keyof TransactionLine): string {
     const v = t[key];
     if (v === undefined || v === null || v === '') return '—';
     if (key === 'date' || key === 'dateCreated' || key === 'dateUpdated') {
@@ -248,8 +248,8 @@ export class TransactiesComponent implements OnInit {
     });
   }
 
-  private groupByOwnAccount(transactions: BankTransactionsHeader[]): TransactionsByAccount[] {
-    const map = new Map<string, BankTransactionsHeader[]>();
+  private groupByOwnAccount(transactions: TransactionLine[]): TransactionsByAccount[] {
+    const map = new Map<string, TransactionLine[]>();
     for (const t of transactions) {
       const key = t.ownAccount || '(unknown)';
       if (!map.has(key)) map.set(key, []);

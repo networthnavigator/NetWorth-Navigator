@@ -35,7 +35,7 @@ import { AuthService } from '../services/auth.service';
           <h2>What is NetWorth Navigator?</h2>
           <p>
             NetWorth Navigator is a personal finance app that helps you track your assets, liabilities and net worth.
-            Import bank transactions from CSV, manage your chart of accounts and ledger, and see how your wealth develops over time.
+            Import transaction data from CSV (bank, credit card, brokerage, crypto) or add movements manually later. Manage your chart of accounts and ledger, and see how your wealth develops over time.
           </p>
           <p>
             Want a clear view of your finances or a single place to follow your progress? NetWorth Navigator gives you the overview without the complexity.
@@ -53,9 +53,9 @@ import { AuthService } from '../services/auth.service';
           </div>
 
           <div class="feature-block">
-            <h3>Bank transactions &amp; upload</h3>
+            <h3>Transactions &amp; upload</h3>
             <p>
-              Upload CSV exports from your bank or add transactions manually. Map columns to your chart of accounts and keep everything in one place.
+              Upload CSV exports from your bank, credit card, brokerage or crypto accounts. Map columns per file type and keep all transaction lines in one place. Manual entry (e.g. cash) is planned.
             </p>
           </div>
 
@@ -67,9 +67,9 @@ import { AuthService } from '../services/auth.service';
           </div>
 
           <div class="feature-block">
-            <h3>Entries &amp; bookkeeping</h3>
+            <h3>Bookings &amp; rules</h3>
             <p>
-              Create and manage entries linked to your accounts. Keep a clear record of income, expenses and movements between accounts.
+              Turn transaction lines into double-entry bookings. Use business rules to suggest the right ledger account (e.g. when the counterparty is a known shop) and keep a clear record of income, expenses and movements.
             </p>
           </div>
 

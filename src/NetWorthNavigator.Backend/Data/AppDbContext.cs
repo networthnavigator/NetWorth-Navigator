@@ -10,7 +10,11 @@ public class AppDbContext : DbContext
     {
     }
 
-    public DbSet<BankTransactionsHeader> BankTransactionsHeaders => Set<BankTransactionsHeader>();
+    public DbSet<TransactionDocument> TransactionDocuments => Set<TransactionDocument>();
+    public DbSet<TransactionDocumentLine> TransactionDocumentLines => Set<TransactionDocumentLine>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingLine> BookingLines => Set<BookingLine>();
+    public DbSet<BusinessRule> BusinessRules => Set<BusinessRule>();
     public DbSet<AccountStructure> AccountStructures => Set<AccountStructure>();
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
     public DbSet<BalanceSheetAccount> BalanceSheetAccounts => Set<BalanceSheetAccount>();
@@ -22,9 +26,20 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<BankTransactionsHeader>(entity =>
+        modelBuilder.Entity<TransactionDocument>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.SourceType).HasMaxLength(32);
+            entity.Property(e => e.SourceName).HasMaxLength(256);
+            entity.Property(e => e.CreatedByUser).HasMaxLength(128);
+            entity.Property(e => e.CreatedByProcess).HasMaxLength(64);
+            entity.Property(e => e.ConfigurationId).HasMaxLength(128);
+            entity.Property(e => e.Status).HasMaxLength(32);
+        });
+        modelBuilder.Entity<TransactionDocumentLine>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Document).WithMany(d => d.Lines).HasForeignKey(e => e.DocumentId).OnDelete(DeleteBehavior.Cascade);
             entity.Property(e => e.OwnAccount).HasMaxLength(64);
             entity.Property(e => e.ContraAccount).HasMaxLength(64);
             entity.Property(e => e.ContraAccountName).HasMaxLength(256);
@@ -39,10 +54,35 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Hash).HasMaxLength(64);
             entity.Property(e => e.CreatedByUser).HasMaxLength(128);
             entity.Property(e => e.CreatedByProcess).HasMaxLength(64);
-            entity.Property(e => e.SourceName).HasMaxLength(256);
             entity.Property(e => e.Status).HasMaxLength(32);
             entity.Property(e => e.UserComments).HasMaxLength(1000);
             entity.Property(e => e.Tag).HasMaxLength(128);
+        });
+        modelBuilder.Entity<Booking>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Reference).HasMaxLength(256);
+            entity.Property(e => e.CreatedByUser).HasMaxLength(128);
+        });
+        modelBuilder.Entity<BookingLine>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Booking).WithMany(b => b.Lines).HasForeignKey(e => e.BookingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.LedgerAccount).WithMany().HasForeignKey(e => e.LedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(e => e.DebitAmount).HasPrecision(18, 2);
+            entity.Property(e => e.CreditAmount).HasPrecision(18, 2);
+            entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.Property(e => e.Description).HasMaxLength(500);
+        });
+        modelBuilder.Entity<BusinessRule>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.LedgerAccount).WithMany().HasForeignKey(e => e.LedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(e => e.Name).HasMaxLength(128);
+            entity.Property(e => e.MatchField).HasMaxLength(64);
+            entity.Property(e => e.MatchOperator).HasMaxLength(32);
+            entity.Property(e => e.MatchValue).HasMaxLength(256);
+            entity.Property(e => e.IsActive).HasConversion<int>();
         });
         modelBuilder.Entity<AccountStructure>(entity =>
         {

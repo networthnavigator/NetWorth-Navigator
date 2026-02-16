@@ -24,8 +24,8 @@ The backend is structured in layers. Dependencies point **inward**: outer layers
 
 - **Responsibility:** Core business concepts; no dependencies on EF, API, or external libs.
 - **Contents:**
-  - **Entities** (`Domain/Entities/`): `BankTransactionsHeader`, `AccountStructure`, `LedgerAccount`, `BalanceSheetAccount`, `InvestmentAccount`, `Property`, `PropertyValuation`, `Mortgage`, etc.
-  - **Repository interfaces** (`Domain/Repositories/`): `IBalanceSheetAccountRepository`, `ILedgerAccountRepository`, `IBankTransactionsHeaderRepository`, `IAccountStructureRepository`, etc.
+  - **Entities** (`Domain/Entities/`): `TransactionDocument`, `TransactionDocumentLine` (header/line model: imports and manual entry — bank, credit card, brokerage, crypto, cash), `Booking`, `BookingLine` (double-entry journal entries; "booking" = boekingsstuk in accounting jargon), `BusinessRule` (rules to suggest ledger account for contra side), `AccountStructure`, `LedgerAccount`, `BalanceSheetAccount`, `InvestmentAccount`, `Property`, `PropertyValuation`, `Mortgage`.
+  - **Repository interfaces** (`Domain/Repositories/`): `IBalanceSheetAccountRepository`, `ILedgerAccountRepository`, `IAccountStructureRepository`, etc.
 - **Rule:** Domain does **not** reference `Microsoft.EntityFrameworkCore`, ASP.NET, or Application/Infrastructure.
 
 ### 1.2 Application (`Application/`)
@@ -59,7 +59,7 @@ The backend is structured in layers. Dependencies point **inward**: outer layers
 
 ## 2. Domain Driven Design (DDD)
 
-- **Bounded contexts** (implicit): e.g. *Transactions* (bank transaction headers), *Chart of Accounts* (structure + ledger accounts), *Assets & Liabilities* (balance-sheet accounts, properties, mortgages).
+- **Bounded contexts** (implicit): e.g. *Transaction documents* (document + lines: imports and manual entry), *Bookings* (double-entry journal entries from document lines + business rules), *Chart of Accounts* (structure + ledger accounts), *Assets & Liabilities* (balance-sheet accounts, properties, mortgages).
 - **Entities:** Identified by id; live in `Domain/Entities`. Same entities are used by Application (via repositories) and mapped by Infrastructure with EF.
 - **Repositories:** Defined in Domain as interfaces; implemented in Infrastructure. They express “what the application needs” from persistence (e.g. `GetAllAsync`, `GetByAssetsCategoryAsync`).
 - **Application services:** Represent use cases; keep orchestration and validation in one place; avoid anemic “services” that only forward to repositories by enriching with rules and DTO mapping.

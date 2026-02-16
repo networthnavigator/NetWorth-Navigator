@@ -25,12 +25,18 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")
         ?? "Data Source=networth.db"));
 
-// CORS for Angular dev server
+// CORS for Angular dev server (and any localhost origin in development)
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrEmpty(origin)) return false;
+                var uri = new Uri(origin);
+                return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                    || uri.Host == "127.0.0.1";
+            })
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -44,49 +50,31 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
-    var hasBankHeaders = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BankTransactionsHeaders'").FirstOrDefault() > 0;
-    if (hasBankHeaders)
+    // Transaction documents (header/line): imports and later manual entry (e.g. cash)
+    var hasTransactionDocs = db.Database.SqlQueryRaw<int>(
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='TransactionDocuments'").OrderBy(x => x).FirstOrDefault() > 0;
+    if (!hasTransactionDocs)
     {
-        var hasTag = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='Tag'").FirstOrDefault() > 0;
-        if (!hasTag)
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN Tag TEXT");
-        var hasMovementType = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='MovementType'").FirstOrDefault() > 0;
-        if (!hasMovementType)
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN MovementType TEXT");
-        var hasMovementTypeLabel = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='MovementTypeLabel'").FirstOrDefault() > 0;
-        if (!hasMovementTypeLabel)
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN MovementTypeLabel TEXT");
-        var hasContraAccountName = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='ContraAccountName'").FirstOrDefault() > 0;
-        if (!hasContraAccountName)
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN ContraAccountName TEXT");
-        var hasExternalId = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='ExternalId'").FirstOrDefault() > 0;
-        if (!hasExternalId)
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN ExternalId TEXT");
-        var hasYear = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='Year'").FirstOrDefault() > 0;
-        if (hasYear)
-        {
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders DROP COLUMN Year");
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders DROP COLUMN Period");
-        }
-        var hasAccountNumber = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='AccountNumber'").FirstOrDefault() > 0;
-        if (hasAccountNumber)
-        {
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders RENAME COLUMN AccountNumber TO OwnAccount");
-            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders RENAME COLUMN Counterparty TO ContraAccount");
-        }
-    }
-    else
         db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE BankTransactionsHeaders (
+            CREATE TABLE TransactionDocuments (
                 Id TEXT PRIMARY KEY,
+                SourceType TEXT NOT NULL DEFAULT 'Bank',
+                SourceName TEXT NOT NULL,
+                UploadedAt TEXT NOT NULL,
+                CreatedByUser TEXT NOT NULL,
+                CreatedByProcess TEXT NOT NULL,
+                ConfigurationId TEXT,
+                Status TEXT NOT NULL DEFAULT 'Imported')");
+    }
+    var hasTransactionDocLines = db.Database.SqlQueryRaw<int>(
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='TransactionDocumentLines'").OrderBy(x => x).FirstOrDefault() > 0;
+    if (!hasTransactionDocLines)
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE TransactionDocumentLines (
+                Id TEXT PRIMARY KEY,
+                DocumentId TEXT NOT NULL REFERENCES TransactionDocuments(Id) ON DELETE CASCADE,
+                LineNumber INTEGER NOT NULL,
                 Date TEXT NOT NULL,
                 OwnAccount TEXT NOT NULL,
                 ContraAccount TEXT NOT NULL,
@@ -104,13 +92,58 @@ using (var scope = app.Services.CreateScope())
                 DateUpdated TEXT NOT NULL,
                 CreatedByUser TEXT NOT NULL,
                 CreatedByProcess TEXT NOT NULL,
-                SourceName TEXT,
                 Status TEXT NOT NULL,
                 UserComments TEXT,
                 Tag TEXT)");
+    }
+
+    // Bookings (double-entry journal entries) and BusinessRules
+    var hasBookings = db.Database.SqlQueryRaw<int>(
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='Bookings'").OrderBy(x => x).FirstOrDefault() > 0;
+    if (!hasBookings)
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE Bookings (
+                Id TEXT PRIMARY KEY,
+                Date TEXT NOT NULL,
+                Reference TEXT NOT NULL,
+                SourceDocumentLineId TEXT REFERENCES TransactionDocumentLines(Id),
+                DateCreated TEXT NOT NULL,
+                CreatedByUser TEXT NOT NULL)");
+    }
+    var hasBookingLines = db.Database.SqlQueryRaw<int>(
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BookingLines'").OrderBy(x => x).FirstOrDefault() > 0;
+    if (!hasBookingLines)
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE BookingLines (
+                Id TEXT PRIMARY KEY,
+                BookingId TEXT NOT NULL REFERENCES Bookings(Id) ON DELETE CASCADE,
+                LineNumber INTEGER NOT NULL,
+                LedgerAccountId INTEGER NOT NULL REFERENCES LedgerAccounts(Id),
+                DebitAmount REAL NOT NULL DEFAULT 0,
+                CreditAmount REAL NOT NULL DEFAULT 0,
+                Currency TEXT NOT NULL DEFAULT 'EUR',
+                Description TEXT)");
+    }
+    var hasBusinessRules = db.Database.SqlQueryRaw<int>(
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BusinessRules'").OrderBy(x => x).FirstOrDefault() > 0;
+    if (!hasBusinessRules)
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE BusinessRules (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                MatchField TEXT NOT NULL DEFAULT 'ContraAccountName',
+                MatchOperator TEXT NOT NULL DEFAULT 'Contains',
+                MatchValue TEXT NOT NULL,
+                LedgerAccountId INTEGER NOT NULL REFERENCES LedgerAccounts(Id),
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                IsActive INTEGER NOT NULL DEFAULT 1)");
+    }
 
     var hasAccountStructures = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='AccountStructures'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='AccountStructures'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasAccountStructures)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -124,7 +157,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     var hasLedgerAccounts = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='LedgerAccounts'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='LedgerAccounts'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasLedgerAccounts)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -137,7 +170,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     var hasAccounts = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BalanceSheetAccounts'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BalanceSheetAccounts'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasAccounts)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -152,13 +185,13 @@ using (var scope = app.Services.CreateScope())
     else
     {
         var hasLedgerAccountId = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) FROM pragma_table_info('BalanceSheetAccounts') WHERE name = 'LedgerAccountId'").FirstOrDefault() > 0;
+            "SELECT COUNT(*) AS Value FROM pragma_table_info('BalanceSheetAccounts') WHERE name = 'LedgerAccountId'").OrderBy(x => x).FirstOrDefault() > 0;
         if (!hasLedgerAccountId)
             db.Database.ExecuteSqlRaw("ALTER TABLE BalanceSheetAccounts ADD COLUMN LedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id)");
     }
 
     var hasInvestmentAccounts = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='InvestmentAccounts'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='InvestmentAccounts'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasInvestmentAccounts)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -171,7 +204,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     var hasPropertiesTable = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='Properties'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='Properties'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasPropertiesTable)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -186,7 +219,7 @@ using (var scope = app.Services.CreateScope())
 
     // Add PurchaseValue column to Properties if it doesn't exist (replaces MarketValue)
     var hasPurchaseValue = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM pragma_table_info('Properties') WHERE name='PurchaseValue'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM pragma_table_info('Properties') WHERE name='PurchaseValue'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasPurchaseValue)
     {
         db.Database.ExecuteSqlRaw("ALTER TABLE Properties ADD COLUMN PurchaseValue REAL");
@@ -196,14 +229,14 @@ using (var scope = app.Services.CreateScope())
 
     // Add PurchaseDate column to Properties if it doesn't exist
     var hasPurchaseDate = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM pragma_table_info('Properties') WHERE name='PurchaseDate'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM pragma_table_info('Properties') WHERE name='PurchaseDate'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasPurchaseDate)
     {
         db.Database.ExecuteSqlRaw("ALTER TABLE Properties ADD COLUMN PurchaseDate TEXT");
     }
 
     var hasPropertyValuations = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='PropertyValuations'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='PropertyValuations'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasPropertyValuations)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -216,7 +249,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     var hasMortgages = db.Database.SqlQueryRaw<int>(
-        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='Mortgages'").FirstOrDefault() > 0;
+        "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='Mortgages'").OrderBy(x => x).FirstOrDefault() > 0;
     if (!hasMortgages)
     {
         db.Database.ExecuteSqlRaw(@"
@@ -239,28 +272,28 @@ using (var scope = app.Services.CreateScope())
     {
         // Add IsPaidOff column if it doesn't exist
         var hasIsPaidOff = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='IsPaidOff'").FirstOrDefault() > 0;
+            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='IsPaidOff'").OrderBy(x => x).FirstOrDefault() > 0;
         if (!hasIsPaidOff)
         {
             db.Database.ExecuteSqlRaw("ALTER TABLE Mortgages ADD COLUMN IsPaidOff INTEGER NOT NULL DEFAULT 0");
         }
         // Add CurrentValue column if it doesn't exist
         var hasCurrentValue = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='CurrentValue'").FirstOrDefault() > 0;
+            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='CurrentValue'").OrderBy(x => x).FirstOrDefault() > 0;
         if (!hasCurrentValue)
         {
             db.Database.ExecuteSqlRaw("ALTER TABLE Mortgages ADD COLUMN CurrentValue REAL");
         }
         // Add ExtraPaidOff column if it doesn't exist
         var hasExtraPaidOff = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='ExtraPaidOff'").FirstOrDefault() > 0;
+            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='ExtraPaidOff'").OrderBy(x => x).FirstOrDefault() > 0;
         if (!hasExtraPaidOff)
         {
             db.Database.ExecuteSqlRaw("ALTER TABLE Mortgages ADD COLUMN ExtraPaidOff REAL NOT NULL DEFAULT 0");
         }
         // Add AmortizationType column if it doesn't exist
         var hasAmortizationType = db.Database.SqlQueryRaw<int>(
-            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='AmortizationType'").FirstOrDefault() > 0;
+            "SELECT COUNT(*) as Value FROM pragma_table_info('Mortgages') WHERE name='AmortizationType'").OrderBy(x => x).FirstOrDefault() > 0;
         if (!hasAmortizationType)
         {
             db.Database.ExecuteSqlRaw("ALTER TABLE Mortgages ADD COLUMN AmortizationType INTEGER NOT NULL DEFAULT 0");
@@ -296,3 +329,6 @@ app.UseCors();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>Exposed for integration tests (WebApplicationFactory).</summary>
+public partial class Program { }

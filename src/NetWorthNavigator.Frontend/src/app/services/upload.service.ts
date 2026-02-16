@@ -10,10 +10,8 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class UploadService {
-  private readonly base =
-    typeof window !== 'undefined' && window.location.port === '4200'
-      ? 'http://localhost:5000/api/upload'
-      : '/api/upload';
+  /** Use relative URL so the Angular dev server proxies /api/* to the backend (avoids CORS). */
+  private readonly base = '/api/upload';
 
   constructor(private http: HttpClient) {}
 
@@ -55,7 +53,7 @@ export class UploadService {
     return this.http.delete<void>(`${this.base}/configurations/${encodeURIComponent(id)}`);
   }
 
-  /** Mappable columns from BankTransactionsHeaders table */
+  /** Mappable columns for imported transaction lines */
   getColumnSchema(): Observable<{ id: string; label: string }[]> {
     return this.http.get<{ id: string; label: string }[]>(`${this.base}/column-schema`);
   }

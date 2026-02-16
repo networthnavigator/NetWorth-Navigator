@@ -67,10 +67,17 @@ public sealed class LedgerAccountRepository : ILedgerAccountRepository
     public async Task DeleteAsync(int id, CancellationToken ct = default)
     {
         var e = await _db.LedgerAccounts.FindAsync([id], ct);
-        if (e != null)
-        {
-            _db.LedgerAccounts.Remove(e);
-            await _db.SaveChangesAsync(ct);
-        }
+        if (e == null) return;
+
+        var usedByBookingLines = await _db.BookingLines.AnyAsync(x => x.LedgerAccountId == id, ct);
+        if (usedByBookingLines)
+            throw new InvalidOperationException("Cannot delete this ledger account: it is used by one or more booking lines.");
+
+        var usedByBusinessRules = await _db.BusinessRules.AnyAsync(x => x.LedgerAccountId == id, ct);
+        if (usedByBusinessRules)
+            throw new InvalidOperationException("Cannot delete this ledger account: it is used by one or more business rules.");
+
+        _db.LedgerAccounts.Remove(e);
+        await _db.SaveChangesAsync(ct);
     }
 }

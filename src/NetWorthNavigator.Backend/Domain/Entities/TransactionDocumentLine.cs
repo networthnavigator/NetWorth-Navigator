@@ -1,9 +1,15 @@
 namespace NetWorthNavigator.Backend.Domain.Entities;
 
-/// <summary>Domain entity: a single bank transaction. Part of the Transaction bounded context.</summary>
-public class BankTransactionsHeader
+/// <summary>
+/// One line of a transaction document (one movement/transaction). From import or manual entry.
+/// </summary>
+public class TransactionDocumentLine
 {
     public Guid Id { get; set; }
+    public Guid DocumentId { get; set; }
+    public TransactionDocument? Document { get; set; }
+    public int LineNumber { get; set; }
+
     public DateTime Date { get; set; }
     public string OwnAccount { get; set; } = string.Empty;
     public string ContraAccount { get; set; } = string.Empty;
@@ -21,7 +27,6 @@ public class BankTransactionsHeader
     public DateTime DateUpdated { get; set; }
     public string CreatedByUser { get; set; } = string.Empty;
     public string CreatedByProcess { get; set; } = string.Empty;
-    public string? SourceName { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? UserComments { get; set; }
     public string? Tag { get; set; }
