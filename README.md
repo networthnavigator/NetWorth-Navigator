@@ -36,7 +36,21 @@ The backend follows **Clean Architecture** and **Domain Driven Design**. See [do
 
 ## Running the Application
 
-### 1. Backend
+### Single command (recommended)
+
+From the project root, run:
+
+```bash
+./start.sh
+```
+
+This script checks if the backend (port 5000) or frontend (port 4200) are already running. If so, it stops them and then starts both. Otherwise it starts both. Press **Ctrl+C** to stop backend and frontend.
+
+Make sure `npm install` has been run at least once in `src/NetWorthNavigator.Frontend` before using `./start.sh`.
+
+### Manual start
+
+**Backend:**
 
 ```bash
 cd src/NetWorthNavigator.Backend
@@ -47,7 +61,7 @@ The backend runs at `http://localhost:5000`. Swagger UI: `http://localhost:5000/
 
 SQLite database `networth.db` is created automatically in the backend project directory.
 
-### 2. Frontend
+**Frontend:**
 
 ```bash
 cd src/NetWorthNavigator.Frontend
