@@ -18,13 +18,21 @@ A personal finance application for tracking expenses, built with .NET 9, Angular
 
 ```
 NetWorth Navigator/
-├── NetWorthNavigator.sln          # .NET solution
-├── NetWorthNavigator.code-workspace  # VS Code workspace
+├── docs/
+│   └── ARCHITECTURE.md            # Clean Architecture & DDD (backend)
 ├── src/
 │   ├── NetWorthNavigator.Backend/   # ASP.NET Core Web API + SQLite
+│   │   ├── Domain/                  # Entities, repository interfaces (DDD)
+│   │   ├── Application/             # Use cases, DTOs, application services
+│   │   ├── Infrastructure/          # Repository implementations, persistence
+│   │   ├── Controllers/             # API layer (thin, delegates to Application)
+│   │   ├── Data/                    # DbContext, seeds
+│   │   └── Services/                # Seed/import infrastructure services
 │   └── NetWorthNavigator.Frontend/  # Angular + Material frontend
 └── .vscode/                       # VS Code launch & tasks
 ```
+
+The backend follows **Clean Architecture** and **Domain Driven Design**. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
 ## Running the Application
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Data;
+using NetWorthNavigator.Backend.Domain.Entities;
 using NetWorthNavigator.Backend.Models;
 
 namespace NetWorthNavigator.Backend.Services;
@@ -48,6 +49,25 @@ public class LedgerSeedService
 
         await _context.SaveChangesAsync();
         return count;
+    }
+
+    /// <summary>Exports current ledger accounts to JSON seed format (array of AccountStructureCode, Code, Name, SortOrder).</summary>
+    public async Task<string> ExportToJsonAsync()
+    {
+        var accounts = await _context.LedgerAccounts
+            .Include(l => l.AccountStructure)
+            .OrderBy(l => l.AccountStructure != null ? l.AccountStructure.Code : "")
+            .ThenBy(l => l.SortOrder)
+            .ThenBy(l => l.Code)
+            .ToListAsync();
+        var list = accounts.Select(l => new LedgerSeedItem
+        {
+            AccountStructureCode = l.AccountStructure?.Code ?? "",
+            Code = l.Code,
+            Name = l.Name,
+            SortOrder = l.SortOrder,
+        }).ToList();
+        return JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
     }
 
     private sealed class LedgerSeedItem

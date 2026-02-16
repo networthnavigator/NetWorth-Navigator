@@ -13,7 +13,7 @@ const storedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('
 const theme = storedTheme && ['purple-green','indigo-pink','cyan-orange','azure-blue','green-teal'].includes(storedTheme)
   ? storedTheme : 'purple-green';
 const darkThemes = ['purple-green', 'indigo-pink', 'cyan-orange', 'azure-blue', 'green-teal'];
-const darkMode = typeof localStorage !== 'undefined' && localStorage.getItem('networth-navigator-darkMode') !== 'false';
+const darkMode = typeof localStorage !== 'undefined' && localStorage.getItem('networth-navigator-darkMode') === 'true';
 const useDark = darkMode && darkThemes.includes(theme);
 let link = document.getElementById('material-theme') as HTMLLinkElement;
 if (link) link.href = `assets/themes/${theme}.css`;

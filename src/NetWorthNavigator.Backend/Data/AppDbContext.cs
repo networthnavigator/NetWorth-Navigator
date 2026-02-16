@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using NetWorthNavigator.Backend.Models;
+using NetWorthNavigator.Backend.Domain.Entities;
 
 namespace NetWorthNavigator.Backend.Data;
 
@@ -27,17 +27,20 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.OwnAccount).HasMaxLength(64);
             entity.Property(e => e.ContraAccount).HasMaxLength(64);
+            entity.Property(e => e.ContraAccountName).HasMaxLength(256);
             entity.Property(e => e.Amount).HasPrecision(18, 2);
             entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.Property(e => e.MovementType).HasMaxLength(32);
+            entity.Property(e => e.MovementTypeLabel).HasMaxLength(128);
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.BalanceAfter).HasPrecision(18, 2);
             entity.Property(e => e.OriginalCsvLine).HasMaxLength(2000);
+            entity.Property(e => e.ExternalId).HasMaxLength(128);
             entity.Property(e => e.Hash).HasMaxLength(64);
             entity.Property(e => e.CreatedByUser).HasMaxLength(128);
             entity.Property(e => e.CreatedByProcess).HasMaxLength(64);
             entity.Property(e => e.SourceName).HasMaxLength(256);
             entity.Property(e => e.Status).HasMaxLength(32);
-            entity.Property(e => e.Period).HasMaxLength(7);  // yyyy-MM
             entity.Property(e => e.UserComments).HasMaxLength(1000);
             entity.Property(e => e.Tag).HasMaxLength(128);
         });
@@ -61,6 +64,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.CurrentBalance).HasPrecision(18, 2);
             entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.HasOne(e => e.LedgerAccount).WithMany().HasForeignKey(e => e.LedgerAccountId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
         modelBuilder.Entity<InvestmentAccount>(entity =>
         {

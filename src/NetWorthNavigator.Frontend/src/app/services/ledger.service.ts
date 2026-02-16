@@ -18,6 +18,11 @@ export class LedgerService {
     return this.http.get<LedgerAccount[]>(this.base);
   }
 
+  /** Ledger accounts in the Assets category only (for linking balance-sheet accounts from transactions). */
+  getAssets(): Observable<LedgerAccount[]> {
+    return this.http.get<LedgerAccount[]>(`${this.base}/assets`);
+  }
+
   create(dto: { accountStructureId: number; code: string; name: string }): Observable<LedgerAccount> {
     return this.http.post<LedgerAccount>(this.base, dto);
   }
@@ -28,5 +33,23 @@ export class LedgerService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+}
+
+const CHART_OF_ACCOUNTS_SEED_BASE =
+  typeof window !== 'undefined' && window.location.port === '4200'
+    ? 'http://localhost:5000/api/chart-of-accounts/seed'
+    : '/api/chart-of-accounts/seed';
+
+@Injectable({ providedIn: 'root' })
+export class ChartOfAccountsSeedService {
+  constructor(private http: HttpClient) {}
+
+  seed(): Observable<{ ledgerAccountsAdded: number }> {
+    return this.http.post<{ ledgerAccountsAdded: number }>(CHART_OF_ACCOUNTS_SEED_BASE, {});
+  }
+
+  updateSeedFile(): Observable<{ message: string; path: string }> {
+    return this.http.post<{ message: string; path: string }>(`${CHART_OF_ACCOUNTS_SEED_BASE}/update-file`, {});
   }
 }

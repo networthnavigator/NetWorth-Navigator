@@ -15,6 +15,10 @@ import {
   UploadConfigDialogComponent,
   UploadConfigDialogData,
 } from './upload-config-dialog.component';
+import {
+  UploadConfigWizardComponent,
+  UploadConfigWizardInput,
+} from './upload-config-wizard.component';
 import { AddBankDialogComponent, AddBankResult } from './add-bank-dialog.component';
 import { DUTCH_BANKS } from '../models/banks.model';
 
@@ -40,8 +44,29 @@ function getDefaultBanks(): AddBankResult[] {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatDialogModule,
+    UploadConfigWizardComponent,
   ],
   template: `
+    @if (wizardActive()) {
+      <app-upload-config-wizard
+        [wizardInput]="wizardInput()!"
+        (saved)="onWizardSaved($event)"
+        (cancel)="exitWizard()"
+      />
+    } @else {
+    <div class="page-header">
+      <div></div>
+      <div class="header-actions">
+        <button mat-stroked-button (click)="updateSeedFile()" matTooltip="Update seed file with current file type configurations">
+          <span class="material-symbols-outlined">save</span>
+          Update seed file
+        </button>
+        <button mat-stroked-button (click)="seedData()" matTooltip="Load file type configurations from repository seed file">
+          <span class="material-symbols-outlined">upload</span>
+          Seed data
+        </button>
+      </div>
+    </div>
     <p class="instruction">
       Select a bank and then the file type you want to add.
       Or add the file directly and let the system determine which configuration matches.
@@ -95,14 +120,19 @@ function getDefaultBanks(): AddBankResult[] {
                 New configuration
               </button>
                 @for (cfg of configurations(); track cfg.id) {
-                  <button
+                  <div
                     class="config-tile"
                     [class.selected]="selectedConfig()?.id === cfg.id"
                     (click)="selectConfig(cfg)"
                   >
-                    <span class="config-name">{{ cfg.name }}</span>
-                    <span class="config-desc">{{ cfg.description }}</span>
-                  </button>
+                    <div class="config-tile-content">
+                      <span class="config-name">{{ cfg.name }}</span>
+                      <span class="config-desc">{{ cfg.description }}</span>
+                    </div>
+                    <button class="config-delete-btn" mat-icon-button type="button" (click)="deleteConfig(cfg); $event.stopPropagation()" matTooltip="Delete configuration" aria-label="Delete configuration">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
                 }
               </div>
             }
@@ -153,9 +183,9 @@ function getDefaultBanks(): AddBankResult[] {
             @if (unknownFilePrompt()) {
               <div class="unknown-prompt">
                 <span class="material-symbols-outlined">help</span>
-                <span>This is an unknown file format. Would you like to create a configuration for this file type?</span>
+                <span>This is an unknown file format. Start the wizard to create a configuration for this file type.</span>
                 <div class="unknown-actions">
-                  <button mat-stroked-button color="primary" (click)="openNewConfigForUnknownFile()">Create configuration</button>
+                  <button mat-stroked-button color="primary" (click)="startConfigWizard()">Create configuration (wizard)</button>
                   <button mat-button (click)="clearFile()">Cancel</button>
                 </div>
               </div>
@@ -191,10 +221,32 @@ function getDefaultBanks(): AddBankResult[] {
               }
             </button>
           </div>
+
+          <div class="test-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="useTestFile()"
+              [disabled]="loadingTestFile() || uploading() || detecting()"
+              matTooltip="Load and upload the built-in test file (dummy data). For testing only."
+            >
+              @if (loadingTestFile()) {
+                <mat-spinner diameter="18"></mat-spinner>
+                Loading test file…
+              } @else {
+                <span class="material-symbols-outlined">science</span>
+                Use test file (testing only)
+              }
+            </button>
+          </div>
         </mat-card-content>
     </mat-card>
+    }
   `,
   styles: [`
+    .page-header { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 16px; }
+    .header-actions { display: flex; gap: 8px; }
+    .header-actions button .material-symbols-outlined { font-size: 20px; vertical-align: middle; margin-right: 4px; }
     .instruction {
       margin: 0 0 24px;
       color: #555;
@@ -289,10 +341,19 @@ function getDefaultBanks(): AddBankResult[] {
       cursor: pointer;
       text-align: left;
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
       transition: all 0.2s;
     }
+    .config-tile-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .config-tile .config-delete-btn {
+      flex-shrink: 0;
+      color: #b00020;
+    }
+    .config-tile .config-delete-btn:hover { color: #d32f2f; }
+    html.theme-dark .config-tile .config-delete-btn { color: #ef5350; }
+    html.theme-dark .config-tile .config-delete-btn:hover { color: #e57373; }
     html.theme-dark .config-tile {
       border-color: rgba(255,255,255,0.12);
       background: rgba(255,255,255,0.05);
@@ -399,6 +460,18 @@ function getDefaultBanks(): AddBankResult[] {
     .detecting { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .actions { display: flex; gap: 16px; justify-content: flex-end; margin-top: 16px; }
     .actions mat-spinner { display: inline-block; margin-right: 8px; }
+    .test-actions {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px dashed rgba(0,0,0,0.15);
+    }
+    html.theme-dark .test-actions { border-top-color: rgba(255,255,255,0.15); }
+    .test-actions button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .test-actions .material-symbols-outlined { font-size: 18px; }
   `],
 })
 export class UploadComponent implements OnInit {
@@ -430,6 +503,9 @@ export class UploadComponent implements OnInit {
   readonly isDragOver = signal(false);
   readonly confirmedForUpload = signal(false);
   readonly unknownFilePrompt = signal(false);
+  readonly loadingTestFile = signal(false);
+  readonly wizardActive = signal(false);
+  readonly wizardInput = signal<UploadConfigWizardInput | null>(null);
 
   ngOnInit() {
     /* Seed: select ING NL by default and load its configurations */
@@ -497,6 +573,25 @@ export class UploadComponent implements OnInit {
 
   selectConfig(cfg: UploadConfiguration) {
     this.selectedConfig.set(cfg);
+  }
+
+  isCustomConfig(cfg: UploadConfiguration): boolean {
+    return cfg.id.startsWith('custom-');
+  }
+
+  deleteConfig(cfg: UploadConfiguration): void {
+    if (!confirm('Delete configuration "' + cfg.name + '"?')) return;
+    this.uploadService.deleteConfiguration(cfg.id).subscribe({
+      next: () => {
+        this.snackBar.open('Configuration deleted', undefined, { duration: 3000 });
+        const bank = this.selectedBank();
+        if (bank) this.loadConfigsForBank(bank.id);
+        if (this.selectedConfig()?.id === cfg.id) this.selectedConfig.set(null);
+      },
+      error: (err) => {
+        this.snackBar.open(err?.error?.error ?? 'Could not delete configuration', undefined, { duration: 3000 });
+      },
+    });
   }
 
   onFileSelected(event: Event) {
@@ -577,44 +672,54 @@ export class UploadComponent implements OnInit {
     });
   }
 
-  openNewConfigForUnknownFile() {
+  /** Start the config wizard for the current unknown file (parse headers then show wizard). */
+  startConfigWizard() {
     const file = this.selectedFile();
     if (!file) return;
     this.uploadService.parseHeaders(file).subscribe({
       next: ({ headers }) => {
-        const data: UploadConfigDialogData = {
+        const bank = this.selectedBank();
+        this.wizardInput.set({
+          file,
+          headers,
+          delimiter: ';',
+          bankId: bank?.id,
           banks: this.banksForConfigDialog(),
-          fileName: file.name,
-          parsedHeaders: headers,
-          isUnknownFile: true,
-        };
-        const ref = this.dialog.open(UploadConfigDialogComponent, {
-          data,
-          width: '520px',
         });
-        ref.afterClosed().subscribe((created?: UploadConfiguration) => {
-          if (created) {
-            const added = this.addedBanks().find(b => b.bankId === created.bankId)
-              ?? this.addBankFromCatalog(created.bankId);
-            if (added) {
-              this._selectedAddedBank.set(added);
-              this.loadingConfigs.set(true);
-              this.uploadService.getConfigurations(added.bankId).subscribe({
-                next: (configs) => {
-                  this.configurations.set(configs);
-                  this.loadingConfigs.set(false);
-                  this.selectedConfig.set(created);
-                  this.detectedConfig.set(created);
-                  this.confirmedForUpload.set(true);
-                  this.unknownFilePrompt.set(false);
-                },
-              });
-            }
-          }
-        });
+        this.wizardActive.set(true);
       },
       error: () => this.snackBar.open('Could not read headers', undefined, { duration: 3000 }),
     });
+  }
+
+  onWizardSaved(created: UploadConfiguration) {
+    this.wizardActive.set(false);
+    this.wizardInput.set(null);
+    const added = this.addedBanks().find(b => b.bankId === created.bankId)
+      ?? this.addBankFromCatalog(created.bankId);
+    if (added) {
+      this._selectedAddedBank.set(added);
+      this.loadingConfigs.set(true);
+      this.uploadService.getConfigurations(added.bankId).subscribe({
+        next: (configs) => {
+          this.configurations.set(configs);
+          this.loadingConfigs.set(false);
+          this.selectedConfig.set(created);
+          this.detectedConfig.set(created);
+          this.confirmedForUpload.set(true);
+          this.unknownFilePrompt.set(false);
+        },
+      });
+    }
+  }
+
+  exitWizard() {
+    this.wizardActive.set(false);
+    this.wizardInput.set(null);
+  }
+
+  openNewConfigForUnknownFile() {
+    this.startConfigWizard();
   }
 
   clearFile() {
@@ -666,6 +771,74 @@ export class UploadComponent implements OnInit {
           undefined,
           { duration: 4000 }
         );
+      },
+    });
+  }
+
+  /** Temporary: load built-in test file and start upload (for testing only). */
+  useTestFile() {
+    const testPath = 'assets/test-files/alle_rekeningen_test.csv';
+    this.loadingTestFile.set(true);
+    fetch(testPath)
+      .then((res) => {
+        if (!res.ok) throw new Error('Test file not found');
+        return res.blob();
+      })
+      .then((blob) => {
+        const file = new File([blob], 'alle_rekeningen_test.csv', { type: 'text/csv' });
+        this.selectedFile.set(file);
+        this.detectedConfig.set(null);
+        this.confirmedForUpload.set(false);
+        this.uploadService.detect(file).subscribe({
+            next: (res) => {
+            this.loadingTestFile.set(false);
+            if (res.detected && res.configuration) {
+              this.detectedConfig.set(res.configuration);
+              this.selectedConfig.set(res.configuration);
+              const added =
+                this.addedBanks().find((b) => b.bankId === res.configuration!.bankId) ??
+                this.addBankFromCatalog(res.configuration!.bankId);
+              if (added) this._selectedAddedBank.set(added);
+              this.confirmedForUpload.set(true);
+              this.onUpload();
+            } else {
+              this.unknownFilePrompt.set(true);
+            }
+          },
+          error: () => {
+            this.loadingTestFile.set(false);
+            this.snackBar.open('Could not analyse test file', undefined, { duration: 3000 });
+          },
+        });
+      })
+      .catch(() => {
+        this.loadingTestFile.set(false);
+        this.snackBar.open('Could not load test file', undefined, { duration: 3000 });
+      });
+  }
+
+  updateSeedFile(): void {
+    if (!confirm('This will update the seed file with your current file type configurations. Continue?')) return;
+    this.uploadService.updateConfigurationsSeedFile().subscribe({
+      next: (result) => {
+        this.snackBar.open('Seed file updated: ' + result.path, undefined, { duration: 4000 });
+      },
+      error: (err) => {
+        this.snackBar.open('Error: ' + (err?.error?.error || err?.message || 'Unknown error'), undefined, { duration: 4000 });
+      },
+    });
+  }
+
+  seedData(): void {
+    if (!confirm('This will add file type configurations from the seed file to your existing configurations. Continue?')) return;
+    this.uploadService.seedConfigurations().subscribe({
+      next: (result) => {
+        this.snackBar.open('Seeded: ' + result.configurationsAdded + ' configuration(s) added.', undefined, { duration: 4000 });
+        const bank = this.selectedBank();
+        if (bank) this.loadConfigsForBank(bank.id);
+      },
+      error: (err) => {
+        this.snackBar.open('Error: ' + (err?.error?.error || err?.message || 'Unknown error'), undefined, { duration: 4000 });
       },
     });
   }

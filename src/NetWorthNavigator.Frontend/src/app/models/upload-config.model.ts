@@ -10,8 +10,11 @@ export interface UploadConfiguration {
   name: string;
   description: string;
   delimiter: string;
+  currency?: string;
   expectedHeaders: string[];
   columnMapping: { fileColumn: string; dbField: string }[];
+  /** File column names (in order) that form the deduplication key. */
+  hashFileColumns?: string[];
 }
 
 export interface DetectResult {

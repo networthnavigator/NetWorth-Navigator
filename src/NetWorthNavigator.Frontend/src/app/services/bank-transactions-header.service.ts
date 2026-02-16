@@ -17,4 +17,14 @@ export class BankTransactionsHeaderService {
   getAll(): Observable<BankTransactionsHeader[]> {
     return this.http.get<BankTransactionsHeader[]>(this.apiUrl);
   }
+
+  /** Delete all transactions (empties the table). */
+  deleteAll(): Observable<{ deleted: number }> {
+    return this.http.delete<{ deleted: number }>(this.apiUrl);
+  }
+
+  /** Distinct OwnAccount values from imported transactions (for adding as balance sheet accounts). */
+  getOwnAccounts(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/own-accounts`);
+  }
 }

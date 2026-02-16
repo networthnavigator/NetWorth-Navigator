@@ -11,6 +11,7 @@ import { forkJoin } from 'rxjs';
 import * as rxjs from 'rxjs';
 import { BalanceSheetAccount, InvestmentAccount, Property, PropertyValuation, Mortgage, AmortizationType } from '../models/assets-liabilities.model';
 import { AssetsLiabilitiesService } from '../services/assets-liabilities.service';
+import { BankTransactionsHeaderService } from '../services/bank-transactions-header.service';
 import { getCurrencySymbol } from '../models/preferences.model';
 import { AccountEditDialogComponent, AccountEditData } from './account-edit-dialog.component';
 import { InvestmentAccountEditDialogComponent, InvestmentAccountEditData } from './investment-account-edit-dialog.component';
@@ -84,6 +85,27 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             }
             <tr class="mat-row" *matNoDataRow><td class="mat-cell" colspan="3">No accounts yet. Add one to get started.</td></tr>
           </table>
+
+          @if (ownAccountsFromTransactions().length > 0) {
+            <div class="own-accounts-from-transactions">
+              <h3 class="own-accounts-title">Accounts from your transactions</h3>
+              <p class="own-accounts-hint">These accounts appear in your imported bank data. Add them to track balances.</p>
+              <ul class="own-accounts-list">
+                @for (ownAccount of ownAccountsToAdd(); track ownAccount) {
+                  <li class="own-account-item">
+                    <span class="own-account-name">{{ ownAccount }}</span>
+                    <button mat-stroked-button color="primary" (click)="addAccount(ownAccount)">
+                      <span class="material-symbols-outlined">add</span>
+                      Add
+                    </button>
+                  </li>
+                }
+              </ul>
+              @if (ownAccountsToAdd().length === 0 && ownAccountsFromTransactions().length > 0) {
+                <p class="own-accounts-all-added">All accounts from your transactions have been added.</p>
+              }
+            </div>
+          }
         </mat-card-content>
       </mat-card>
     </section>
@@ -269,10 +291,30 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
     .full-width { width: 100%; }
     .total-row { font-weight: 500; border-top: 1px solid rgba(0,0,0,0.12); }
     html.theme-dark .total-row { border-top-color: rgba(255,255,255,0.12); }
+    .own-accounts-from-transactions {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(0,0,0,0.12);
+    }
+    html.theme-dark .own-accounts-from-transactions { border-top-color: rgba(255,255,255,0.12); }
+    .own-accounts-title { margin: 0 0 4px; font-size: 1rem; font-weight: 500; }
+    .own-accounts-hint { margin: 0 0 12px; font-size: 0.9rem; color: var(--mat-sys-on-surface-variant, #555); }
+    html.theme-dark .own-accounts-hint { color: rgba(255,255,255,0.7); }
+    .own-accounts-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .own-account-item {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 8px 12px; background: rgba(0,0,0,0.03); border-radius: 8px;
+    }
+    html.theme-dark .own-account-item { background: rgba(255,255,255,0.06); }
+    .own-account-name { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 0.9rem; }
+    .own-account-item button .material-symbols-outlined { font-size: 18px; vertical-align: middle; margin-right: 4px; }
+    .own-accounts-all-added { margin: 0; font-size: 0.9rem; color: var(--mat-sys-on-surface-variant, #666); font-style: italic; }
+    html.theme-dark .own-accounts-all-added { color: rgba(255,255,255,0.6); }
   `],
 })
 export class AssetsLiabilitiesComponent implements OnInit {
   private readonly service = inject(AssetsLiabilitiesService);
+  private readonly bankTransactionsService = inject(BankTransactionsHeaderService);
   private readonly dialog = inject(MatDialog);
 
   readonly accounts = signal<BalanceSheetAccount[]>([]);
@@ -280,10 +322,16 @@ export class AssetsLiabilitiesComponent implements OnInit {
   readonly properties = signal<Property[]>([]);
   readonly propertyValuations = signal<Map<number, PropertyValuation[]>>(new Map());
   readonly mortgages = signal<Mortgage[]>([]);
+  readonly ownAccountsFromTransactions = signal<string[]>([]);
 
   readonly accountsTotal = computed(() =>
     this.accounts().reduce((sum, a) => sum + a.currentBalance, 0)
   );
+  /** Own accounts from transactions that are not yet in My Accounts (by name). */
+  readonly ownAccountsToAdd = computed(() => {
+    const existingNames = new Set(this.accounts().map(a => a.name));
+    return this.ownAccountsFromTransactions().filter(name => !existingNames.has(name));
+  });
   readonly investmentAccountsTotal = computed(() =>
     this.investmentAccounts().reduce((sum, a) => sum + a.currentBalance, 0)
   );
@@ -317,9 +365,12 @@ export class AssetsLiabilitiesComponent implements OnInit {
         this.investmentAccounts.set(r.investmentAccounts);
         this.properties.set(r.properties);
         this.mortgages.set(r.mortgages);
-        // Load valuations for all properties
         this.loadPropertyValuations(r.properties);
       },
+    });
+    this.bankTransactionsService.getOwnAccounts().subscribe({
+      next: (list) => this.ownAccountsFromTransactions.set(list),
+      error: () => this.ownAccountsFromTransactions.set([]),
     });
   }
 
@@ -510,8 +561,9 @@ export class AssetsLiabilitiesComponent implements OnInit {
     });
   }
 
-  addAccount(): void {
-    const ref = this.dialog.open(AccountEditDialogComponent, { data: {} as AccountEditData, width: '400px' });
+  addAccount(initialName?: string): void {
+    const data: AccountEditData = initialName ? { initialName } : {};
+    const ref = this.dialog.open(AccountEditDialogComponent, { data, width: '400px' });
     ref.afterClosed().subscribe((result) => {
       if (result) this.service.createAccount(result).subscribe(() => this.load());
     });

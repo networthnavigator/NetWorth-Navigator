@@ -14,8 +14,11 @@ public class UploadConfigurationDto
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Delimiter { get; set; } = ";";
+    public string Currency { get; set; } = "EUR";
     public string[] ExpectedHeaders { get; set; } = [];
     public ColumnMappingDto[] ColumnMapping { get; set; } = [];
+    /// <summary>File column names (in order) that form the deduplication key. If one column, its value is used as ExternalId; if multiple, their concatenation is hashed.</summary>
+    public string[]? HashFileColumns { get; set; }
 }
 
 public class ColumnMappingDto

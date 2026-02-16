@@ -1,6 +1,6 @@
-namespace NetWorthNavigator.Backend.Models;
+namespace NetWorthNavigator.Backend.Domain.Entities;
 
-/// <summary>Investment account (brokerage, investment platform) with current balance/value.</summary>
+/// <summary>Investment account (brokerage, investment platform). Part of the Assets & Liabilities context.</summary>
 public class InvestmentAccount
 {
     public int Id { get; set; }

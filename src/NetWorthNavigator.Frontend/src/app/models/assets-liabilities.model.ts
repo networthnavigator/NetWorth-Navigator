@@ -4,6 +4,8 @@ export interface BalanceSheetAccount {
   currentBalance: number;
   currency: string;
   sortOrder: number;
+  ledgerAccountId?: number | null;
+  ledgerAccountName?: string | null;
 }
 
 export interface InvestmentAccount {

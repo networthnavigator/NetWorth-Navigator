@@ -9,7 +9,7 @@ const STORAGE_PREFIX = 'networth-navigator-';
 export class UserPreferencesService {
   private readonly _defaultCurrency = signal<CurrencyCode>(this.load('defaultCurrency', 'EUR') as CurrencyCode);
   private readonly _theme = signal<ThemeId>(this.loadTheme());
-  private readonly _darkMode = signal<boolean>(this.load('darkMode', 'true') === 'true');
+  private readonly _darkMode = signal<boolean>((this.load('darkMode', 'false') as string) === 'true');
   private loadTheme(): ThemeId {
     const stored = this.load('theme', 'purple-green');
     const valid: ThemeId[] = ['purple-green', 'indigo-pink', 'cyan-orange', 'azure-blue', 'green-teal'];
@@ -36,8 +36,9 @@ export class UserPreferencesService {
   }
 
   setDarkMode(on: boolean): void {
-    this._darkMode.set(on);
-    this.save('darkMode', String(on));
+    // Dark mode is locked off until implemented
+    this._darkMode.set(false);
+    this.save('darkMode', 'false');
     this.applyTheme(this._theme());
   }
 

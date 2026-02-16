@@ -1,6 +1,6 @@
-namespace NetWorthNavigator.Backend.Models;
+namespace NetWorthNavigator.Backend.Domain.Entities;
 
-/// <summary>Property valuation at a specific date.</summary>
+/// <summary>Property valuation at a specific date. Part of the Assets & Liabilities context.</summary>
 public class PropertyValuation
 {
     public int Id { get; set; }

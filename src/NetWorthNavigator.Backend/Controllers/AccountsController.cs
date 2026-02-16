@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NetWorthNavigator.Backend.Data;
-using NetWorthNavigator.Backend.Models;
+using NetWorthNavigator.Backend.Application.DTOs;
+using NetWorthNavigator.Backend.Application.Services;
 
 namespace NetWorthNavigator.Backend.Controllers;
 
@@ -9,45 +8,36 @@ namespace NetWorthNavigator.Backend.Controllers;
 [Route("api/assets-liabilities/accounts")]
 public class AccountsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAccountsApplicationService _service;
 
-    public AccountsController(AppDbContext context) => _context = context;
+    public AccountsController(IAccountsApplicationService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<BalanceSheetAccount>>> GetAll() =>
-        Ok(await _context.BalanceSheetAccounts.AsNoTracking().OrderBy(a => a.SortOrder).ThenBy(a => a.Name).ToListAsync());
+    public async Task<ActionResult<IEnumerable<BalanceSheetAccountDto>>> GetAll(CancellationToken ct)
+    {
+        var list = await _service.GetAllAsync(ct);
+        return Ok(list);
+    }
 
     [HttpPost]
-    public async Task<ActionResult<BalanceSheetAccount>> Create([FromBody] BalanceSheetAccount item)
+    public async Task<ActionResult<BalanceSheetAccountDto>> Create([FromBody] BalanceSheetAccountCreateUpdateDto dto, CancellationToken ct)
     {
-        item.Id = 0;
-        var maxOrder = await _context.BalanceSheetAccounts.Select(a => (int?)a.SortOrder).MaxAsync() ?? 0;
-        item.SortOrder = maxOrder + 1;
-        _context.BalanceSheetAccounts.Add(item);
-        await _context.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetAll), new { id = item.Id }, item);
+        var result = await _service.CreateAsync(dto, ct);
+        return CreatedAtAction(nameof(GetAll), new { id = result.Id }, result);
     }
 
     [HttpPut("{id:int}")]
-    public async Task<ActionResult<BalanceSheetAccount>> Update(int id, [FromBody] BalanceSheetAccount item)
+    public async Task<ActionResult<BalanceSheetAccountDto>> Update(int id, [FromBody] BalanceSheetAccountCreateUpdateDto dto, CancellationToken ct)
     {
-        if (id != item.Id) return BadRequest();
-        var existing = await _context.BalanceSheetAccounts.FindAsync(id);
-        if (existing == null) return NotFound();
-        existing.Name = item.Name;
-        existing.CurrentBalance = item.CurrentBalance;
-        existing.Currency = item.Currency ?? "EUR";
-        await _context.SaveChangesAsync();
-        return Ok(existing);
+        var result = await _service.UpdateAsync(id, dto, ct);
+        if (result == null) return NotFound();
+        return Ok(result);
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
-        var existing = await _context.BalanceSheetAccounts.FindAsync(id);
-        if (existing == null) return NotFound();
-        _context.BalanceSheetAccounts.Remove(existing);
-        await _context.SaveChangesAsync();
+        if (!await _service.DeleteAsync(id, ct)) return NotFound();
         return NoContent();
     }
 }

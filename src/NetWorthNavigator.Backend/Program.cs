@@ -4,7 +4,13 @@ using NetWorthNavigator.Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services
+// Add services - Clean Architecture: Domain repositories (Infrastructure) + Application services
+builder.Services.AddScoped<NetWorthNavigator.Backend.Domain.Repositories.IBalanceSheetAccountRepository, NetWorthNavigator.Backend.Infrastructure.Repositories.BalanceSheetAccountRepository>();
+builder.Services.AddScoped<NetWorthNavigator.Backend.Domain.Repositories.ILedgerAccountRepository, NetWorthNavigator.Backend.Infrastructure.Repositories.LedgerAccountRepository>();
+builder.Services.AddScoped<NetWorthNavigator.Backend.Domain.Repositories.IAccountStructureRepository, NetWorthNavigator.Backend.Infrastructure.Repositories.AccountStructureRepository>();
+builder.Services.AddScoped<NetWorthNavigator.Backend.Application.Services.IAccountsApplicationService, NetWorthNavigator.Backend.Application.Services.AccountsApplicationService>();
+builder.Services.AddScoped<NetWorthNavigator.Backend.Application.Services.ILedgerApplicationService, NetWorthNavigator.Backend.Application.Services.LedgerApplicationService>();
+
 builder.Services.AddScoped<AccountStructureImportService>();
 builder.Services.AddScoped<LedgerSeedService>();
 builder.Services.AddScoped<AssetsLiabilitiesSeedService>();
@@ -46,6 +52,29 @@ using (var scope = app.Services.CreateScope())
             "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='Tag'").FirstOrDefault() > 0;
         if (!hasTag)
             db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN Tag TEXT");
+        var hasMovementType = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='MovementType'").FirstOrDefault() > 0;
+        if (!hasMovementType)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN MovementType TEXT");
+        var hasMovementTypeLabel = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='MovementTypeLabel'").FirstOrDefault() > 0;
+        if (!hasMovementTypeLabel)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN MovementTypeLabel TEXT");
+        var hasContraAccountName = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='ContraAccountName'").FirstOrDefault() > 0;
+        if (!hasContraAccountName)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN ContraAccountName TEXT");
+        var hasExternalId = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='ExternalId'").FirstOrDefault() > 0;
+        if (!hasExternalId)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders ADD COLUMN ExternalId TEXT");
+        var hasYear = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='Year'").FirstOrDefault() > 0;
+        if (hasYear)
+        {
+            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders DROP COLUMN Year");
+            db.Database.ExecuteSqlRaw("ALTER TABLE BankTransactionsHeaders DROP COLUMN Period");
+        }
         var hasAccountNumber = db.Database.SqlQueryRaw<int>(
             "SELECT COUNT(*) as Value FROM pragma_table_info('BankTransactionsHeaders') WHERE name='AccountNumber'").FirstOrDefault() > 0;
         if (hasAccountNumber)
@@ -61,11 +90,15 @@ using (var scope = app.Services.CreateScope())
                 Date TEXT NOT NULL,
                 OwnAccount TEXT NOT NULL,
                 ContraAccount TEXT NOT NULL,
+                ContraAccountName TEXT,
                 Amount REAL NOT NULL,
                 Currency TEXT NOT NULL DEFAULT 'EUR',
+                MovementType TEXT,
+                MovementTypeLabel TEXT,
                 Description TEXT,
                 BalanceAfter REAL,
                 OriginalCsvLine TEXT,
+                ExternalId TEXT,
                 Hash TEXT NOT NULL,
                 DateCreated TEXT NOT NULL,
                 DateUpdated TEXT NOT NULL,
@@ -73,8 +106,6 @@ using (var scope = app.Services.CreateScope())
                 CreatedByProcess TEXT NOT NULL,
                 SourceName TEXT,
                 Status TEXT NOT NULL,
-                Year INTEGER NOT NULL,
-                Period TEXT NOT NULL,
                 UserComments TEXT,
                 Tag TEXT)");
 
@@ -115,7 +146,15 @@ using (var scope = app.Services.CreateScope())
                 Name TEXT NOT NULL,
                 CurrentBalance REAL NOT NULL DEFAULT 0,
                 Currency TEXT NOT NULL DEFAULT 'EUR',
-                SortOrder INTEGER NOT NULL DEFAULT 0)");
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                LedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id))");
+    }
+    else
+    {
+        var hasLedgerAccountId = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) FROM pragma_table_info('BalanceSheetAccounts') WHERE name = 'LedgerAccountId'").FirstOrDefault() > 0;
+        if (!hasLedgerAccountId)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BalanceSheetAccounts ADD COLUMN LedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id)");
     }
 
     var hasInvestmentAccounts = db.Database.SqlQueryRaw<int>(

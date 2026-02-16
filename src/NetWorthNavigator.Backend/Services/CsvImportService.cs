@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Data;
+using NetWorthNavigator.Backend.Domain.Entities;
 using NetWorthNavigator.Backend.Models;
 
 namespace NetWorthNavigator.Backend.Services;
@@ -46,35 +47,7 @@ public class CsvImportService
         }
     }
 
-    private static IEnumerable<UploadConfigurationDto> AllConfigurations =>
-        BuiltInConfigurations.Concat(GetCustomConfigurations());
-
-    public static IReadOnlyList<UploadConfigurationDto> BuiltInConfigurations { get; } =
-    [
-        new UploadConfigurationDto
-        {
-            Id = "ing-betaalrekening-csv",
-            BankId = "ing",
-            Name = "Betaalrekening – puntkommagescheiden CSV met saldo",
-            Description = "Export van ING internetbankieren: Betaalrekening, puntkommagescheiden CSV met saldo",
-            Delimiter = ";",
-            ExpectedHeaders =
-            [
-                "Datum", "Naam / Omschrijving", "Rekening", "Tegenrekening", "Code", "Af Bij",
-                "Bedrag (EUR)", "Mutatiesoort", "Mededelingen", "Saldo na mutatie", "Tag"
-            ],
-            ColumnMapping =
-            [
-                new ColumnMappingDto { FileColumn = "Datum", DbField = "Date" },
-                new ColumnMappingDto { FileColumn = "Naam / Omschrijving", DbField = "Description" },
-                new ColumnMappingDto { FileColumn = "Rekening", DbField = "OwnAccount" },
-                new ColumnMappingDto { FileColumn = "Tegenrekening", DbField = "ContraAccount" },
-                new ColumnMappingDto { FileColumn = "Bedrag (EUR)", DbField = "Amount" },
-                new ColumnMappingDto { FileColumn = "Af Bij", DbField = "_AmountSign" },
-                new ColumnMappingDto { FileColumn = "Saldo na mutatie", DbField = "BalanceAfter" },
-            ],
-        },
-    ];
+    private static IEnumerable<UploadConfigurationDto> AllConfigurations => GetCustomConfigurations();
 
     public IReadOnlyList<UploadConfigurationDto> GetConfigurationsByBank(string bankId) =>
         AllConfigurations.Where(c => c.BankId.Equals(bankId, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -87,6 +60,7 @@ public class CsvImportService
             throw new ArgumentException("Name is required");
         config.Id = $"custom-{Guid.NewGuid():N}";
         if (string.IsNullOrWhiteSpace(config.Delimiter)) config.Delimiter = ";";
+        if (string.IsNullOrWhiteSpace(config.Currency)) config.Currency = "EUR";
         var custom = GetCustomConfigurations();
         lock (_customConfigLock)
         {
@@ -110,6 +84,73 @@ public class CsvImportService
 
     public UploadConfigurationDto? GetConfigurationById(string id) =>
         AllConfigurations.FirstOrDefault(c => c.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Deletes a configuration by id. Returns true if removed.</summary>
+    public async Task<bool> DeleteConfigurationAsync(string id, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return false;
+        var custom = GetCustomConfigurations();
+        var index = custom.FindIndex(c => c.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+            return false;
+        lock (_customConfigLock)
+        {
+            custom.RemoveAt(index);
+            var path = Path.Combine(AppContext.BaseDirectory, "Data", "upload-configurations.json");
+            var json = JsonSerializer.Serialize(custom.ToList(), new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json);
+            InvalidateCustomConfigurationsCache();
+        }
+        return await Task.FromResult(true);
+    }
+
+    /// <summary>Exports current custom configurations to JSON (for seed file).</summary>
+    public string ExportCustomConfigurationsToJson()
+    {
+        var custom = GetCustomConfigurations();
+        return JsonSerializer.Serialize(custom.ToList(), new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>Imports configurations from seed JSON and merges with existing custom configs (by Id). Returns number added.</summary>
+    public async Task<int> ImportSeedAsync(string seedJson, CancellationToken ct = default)
+    {
+        var seedList = JsonSerializer.Deserialize<List<UploadConfigurationDto>>(seedJson);
+        if (seedList == null || seedList.Count == 0)
+            return 0;
+        var custom = GetCustomConfigurations();
+        var existingIds = new HashSet<string>(custom.Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
+        int added = 0;
+        lock (_customConfigLock)
+        {
+            foreach (var config in seedList)
+            {
+                if (string.IsNullOrWhiteSpace(config.BankId) || string.IsNullOrWhiteSpace(config.Name))
+                    continue;
+                if (existingIds.Contains(config.Id))
+                    continue;
+                config.Id = string.IsNullOrWhiteSpace(config.Id) ? $"custom-{Guid.NewGuid():N}" : config.Id;
+                if (string.IsNullOrWhiteSpace(config.Delimiter)) config.Delimiter = ";";
+                custom.Add(config);
+                existingIds.Add(config.Id);
+                added++;
+            }
+            var path = Path.Combine(AppContext.BaseDirectory, "Data", "upload-configurations.json");
+            var json = JsonSerializer.Serialize(custom.ToList(), new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json);
+            InvalidateCustomConfigurationsCache();
+        }
+        return await Task.FromResult(added);
+    }
+
+    /// <summary>Clears the in-memory cache so next read loads from file.</summary>
+    public static void InvalidateCustomConfigurationsCache()
+    {
+        lock (_customConfigLock)
+        {
+            _customConfigs = null;
+        }
+    }
 
     public string? DetectConfiguration(Stream csvStream)
     {
@@ -151,37 +192,61 @@ public class CsvImportService
             return (0, 0);
 
         var headers = ParseCsvLine(headerLine, config.Delimiter);
-        var colIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < headers.Length; i++)
-            colIndex[headers[i].Trim().Trim('"')] = i;
+        var headerNames = headers.Select(h => h.Trim().Trim('"')).ToArray();
 
-        var imported = 0;
-        var skipped = 0;
-        var now = DateTime.UtcNow;
-        var user = "User";
-        var hashList = await _context.BankTransactionsHeaders
-            .Select(h => h.Hash)
-            .ToListAsync(ct);
-        var existingHashes = new HashSet<string>(hashList);
-
+        var dataLines = new List<string>();
         while (reader.ReadLine() is { } line)
         {
-            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (!string.IsNullOrWhiteSpace(line))
+                dataLines.Add(line);
+        }
 
-            var values = ParseCsvLine(line, config.Delimiter);
-            var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            for (var i = 0; i < headers.Length && i < values.Length; i++)
-                row[headers[i].Trim().Trim('"')] = values[i].Trim().Trim('"');
+        var now = DateTime.UtcNow;
+        var user = "User";
 
+        // Dedup key = ExternalId when provided by bank, otherwise Hash. Load all existing keys from DB.
+        var existingKeyList = await _context.BankTransactionsHeaders
+            .Select(h => h.ExternalId != null ? h.ExternalId : h.Hash)
+            .ToListAsync(ct);
+        var existingKeys = new HashSet<string>(existingKeyList, StringComparer.OrdinalIgnoreCase);
+
+        // First pass: compute dedup key per line and count how often each key appears in this file.
+        var lineEntries = new List<(string Key, string Line)>();
+        var skippedInvalid = 0;
+        foreach (var line in dataLines)
+        {
+            var row = LineToRow(line, config.Delimiter, headerNames);
+            var header = MapToBankTransactionsHeader(config, row, fileName, now, user, line);
+            if (header == null) { skippedInvalid++; continue; }
+            var key = header.ExternalId ?? header.Hash;
+            lineEntries.Add((key, line));
+        }
+
+        var keyCountInFile = lineEntries
+            .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var imported = 0;
+        var skipped = skippedInvalid;
+
+        foreach (var (key, line) in lineEntries)
+        {
             try
             {
+                // Skip only when key already in DB and this key appears just once in the file.
+                // When the same key appears multiple times in the file, add all (e.g. bank sends duplicates).
+                if (existingKeys.Contains(key) && keyCountInFile[key] <= 1)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var row = LineToRow(line, config.Delimiter, headerNames);
                 var header = MapToBankTransactionsHeader(config, row, fileName, now, user, line);
                 if (header == null) { skipped++; continue; }
 
-                if (existingHashes.Contains(header.Hash)) { skipped++; continue; }
-
                 _context.BankTransactionsHeaders.Add(header);
-                existingHashes.Add(header.Hash);
+                existingKeys.Add(key);
                 imported++;
             }
             catch
@@ -192,6 +257,15 @@ public class CsvImportService
 
         await _context.SaveChangesAsync(ct);
         return (imported, skipped);
+    }
+
+    private static Dictionary<string, string> LineToRow(string line, string delimiter, string[] headerNames)
+    {
+        var values = ParseCsvLine(line, delimiter);
+        var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < headerNames.Length && i < values.Length; i++)
+            row[headerNames[i]] = values[i].Trim().Trim('"');
+        return row;
     }
 
     private static string GetMappedValue(Dictionary<string, string> row, UploadConfigurationDto config, string dbField)
@@ -232,7 +306,10 @@ public class CsvImportService
 
         var ownAccount = GetMappedValue(row, config, "OwnAccount");
         var contraAccount = GetMappedValue(row, config, "ContraAccount");
+        var contraAccountName = GetMappedValue(row, config, "ContraAccountName");
         var description = GetMappedValue(row, config, "Description");
+        var movementType = GetMappedValue(row, config, "MovementType");
+        var movementTypeLabel = GetMappedValue(row, config, "MovementTypeLabel");
         var tag = GetMappedValue(row, config, "Tag");
         var balanceStr = GetMappedValue(row, config, "BalanceAfter");
         decimal? balanceAfter = null;
@@ -240,7 +317,30 @@ public class CsvImportService
             decimal.TryParse(balanceStr.Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out var b))
             balanceAfter = b;
 
-        var hash = ComputeHash($"{date:yyyy-MM-dd}|{ownAccount}|{contraAccount}|{amount}|{balanceAfter}");
+        string? externalId = null;
+        string hash;
+        if (config.HashFileColumns is { Length: > 0 })
+        {
+            var keyParts = config.HashFileColumns.Select(col => GetValue(row, col) ?? "").ToList();
+            var keyString = string.Join("|", keyParts);
+            if (config.HashFileColumns.Length == 1)
+            {
+                externalId = string.IsNullOrWhiteSpace(keyString) ? null : keyString.Trim();
+                hash = string.IsNullOrWhiteSpace(keyString) ? ComputeHash($"{date:yyyy-MM-dd}|{ownAccount}|{contraAccount}|{amount}|{balanceAfter}") : keyString.Trim();
+            }
+            else
+            {
+                hash = ComputeHash(keyString);
+            }
+        }
+        else
+        {
+            var externalIdRaw = GetMappedValue(row, config, "ExternalId");
+            externalId = string.IsNullOrWhiteSpace(externalIdRaw) ? null : externalIdRaw.Trim();
+            hash = string.IsNullOrWhiteSpace(externalId)
+                ? ComputeHash($"{date:yyyy-MM-dd}|{ownAccount}|{contraAccount}|{amount}|{balanceAfter}")
+                : externalId;
+        }
 
         return new BankTransactionsHeader
         {
@@ -248,11 +348,15 @@ public class CsvImportService
             Date = date,
             OwnAccount = ownAccount,
             ContraAccount = contraAccount,
+            ContraAccountName = string.IsNullOrWhiteSpace(contraAccountName) ? null : contraAccountName.Trim(),
             Amount = amount,
-            Currency = "EUR",
+            Currency = string.IsNullOrWhiteSpace(config.Currency) ? "EUR" : config.Currency.Trim().ToUpperInvariant(),
+            MovementType = string.IsNullOrWhiteSpace(movementType) ? null : movementType.Trim(),
+            MovementTypeLabel = string.IsNullOrWhiteSpace(movementTypeLabel) ? null : movementTypeLabel.Trim(),
             Description = description,
             BalanceAfter = balanceAfter,
             OriginalCsvLine = rawLine.Length > 2000 ? rawLine[..2000] : rawLine,
+            ExternalId = externalId,
             Hash = hash,
             DateCreated = now,
             DateUpdated = now,
@@ -260,8 +364,6 @@ public class CsvImportService
             CreatedByProcess = "Upload",
             SourceName = fileName,
             Status = "Imported",
-            Year = date.Year,
-            Period = $"{date:yyyy-MM}",
             Tag = string.IsNullOrEmpty(tag) ? null : tag,
         };
     }

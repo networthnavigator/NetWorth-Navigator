@@ -16,10 +16,22 @@ export class AssetsLiabilitiesService {
     return this.http.get<BalanceSheetAccount[]>(`${BASE}/accounts`);
   }
   createAccount(item: Partial<BalanceSheetAccount>): Observable<BalanceSheetAccount> {
-    return this.http.post<BalanceSheetAccount>(`${BASE}/accounts`, item);
+    const body = {
+      name: item.name,
+      currentBalance: item.currentBalance ?? 0,
+      currency: item.currency ?? 'EUR',
+      ledgerAccountId: item.ledgerAccountId ?? null,
+    };
+    return this.http.post<BalanceSheetAccount>(`${BASE}/accounts`, body);
   }
   updateAccount(item: BalanceSheetAccount): Observable<BalanceSheetAccount> {
-    return this.http.put<BalanceSheetAccount>(`${BASE}/accounts/${item.id}`, item);
+    const body = {
+      name: item.name,
+      currentBalance: item.currentBalance,
+      currency: item.currency,
+      ledgerAccountId: item.ledgerAccountId ?? null,
+    };
+    return this.http.put<BalanceSheetAccount>(`${BASE}/accounts/${item.id}`, body);
   }
   deleteAccount(id: number): Observable<void> {
     return this.http.delete<void>(`${BASE}/accounts/${id}`);

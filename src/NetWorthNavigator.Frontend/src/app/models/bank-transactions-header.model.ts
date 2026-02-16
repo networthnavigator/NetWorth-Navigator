@@ -3,11 +3,15 @@ export interface BankTransactionsHeader {
   date: string;
   ownAccount: string;
   contraAccount: string;
+  contraAccountName?: string;
   amount: number;
   currency: string;
+  movementType?: string;
+  movementTypeLabel?: string;
   description?: string;
   balanceAfter?: number;
   originalCsvLine?: string;
+  externalId?: string;
   hash: string;
   dateCreated: string;
   dateUpdated: string;
@@ -15,8 +19,6 @@ export interface BankTransactionsHeader {
   createdByProcess: string;
   sourceName?: string;
   status: string;
-  year: number;
-  period: string;
   userComments?: string;
   tag?: string;
 }

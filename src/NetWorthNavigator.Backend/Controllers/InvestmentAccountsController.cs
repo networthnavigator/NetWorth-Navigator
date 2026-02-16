@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Data;
-using NetWorthNavigator.Backend.Models;
+using NetWorthNavigator.Backend.Domain.Entities;
 
 namespace NetWorthNavigator.Backend.Controllers;
 

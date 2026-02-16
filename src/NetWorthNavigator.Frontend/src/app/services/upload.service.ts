@@ -51,8 +51,22 @@ export class UploadService {
     return this.http.post<UploadConfiguration>(`${this.base}/configurations`, config);
   }
 
+  deleteConfiguration(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/configurations/${encodeURIComponent(id)}`);
+  }
+
   /** Mappable columns from BankTransactionsHeaders table */
   getColumnSchema(): Observable<{ id: string; label: string }[]> {
     return this.http.get<{ id: string; label: string }[]>(`${this.base}/column-schema`);
+  }
+
+  /** Import file type configurations from seed file */
+  seedConfigurations(): Observable<{ configurationsAdded: number }> {
+    return this.http.post<{ configurationsAdded: number }>(`${this.base}/seed`, {});
+  }
+
+  /** Update seed file with current custom configurations */
+  updateConfigurationsSeedFile(): Observable<{ message: string; path: string }> {
+    return this.http.post<{ message: string; path: string }>(`${this.base}/seed/update-file`, {});
   }
 }

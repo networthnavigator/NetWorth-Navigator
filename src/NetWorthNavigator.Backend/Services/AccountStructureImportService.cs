@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Data;
+using NetWorthNavigator.Backend.Domain.Entities;
 using NetWorthNavigator.Backend.Models;
 
 namespace NetWorthNavigator.Backend.Services;

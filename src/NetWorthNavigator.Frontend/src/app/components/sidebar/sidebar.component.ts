@@ -41,13 +41,6 @@ import { THEMES, CURRENCIES } from '../../models/preferences.model';
             <span class="nav-label">Assets & Liabilities</span>
           }
         </a>
-        <a routerLink="/wizard-poc" routerLinkActive="active"
-           [matTooltip]="collapsed() ? 'Mapping wizard' : null" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">tune</span>
-          @if (!collapsed()) {
-            <span class="nav-label">Wizard PoC</span>
-          }
-        </a>
         <a routerLink="/upload" routerLinkActive="active"
            [matTooltip]="collapsed() ? 'Upload' : null" class="nav-item">
           <span class="material-symbols-outlined nav-icon">upload_file</span>
@@ -98,9 +91,9 @@ import { THEMES, CURRENCIES } from '../../models/preferences.model';
                 }
               </mat-select>
             </mat-form-field>
-            <div class="dark-mode-row">
+            <div class="dark-mode-row" matTooltip="Dark mode (coming later)">
               <span>Dark mode</span>
-              <mat-slide-toggle [checked]="prefs.darkMode()" (change)="prefs.setDarkMode($event.checked)"></mat-slide-toggle>
+              <mat-slide-toggle [checked]="false" disabled></mat-slide-toggle>
             </div>
             <button mat-stroked-button type="button" class="logout-btn" (click)="logout()">
               Log out
@@ -207,7 +200,7 @@ import { THEMES, CURRENCIES } from '../../models/preferences.model';
     .user-menu-content { padding: 16px; min-width: 220px; }
     .menu-field { width: 100%; display: block; margin-bottom: 8px; }
     .menu-field .mat-mdc-form-field-subscript-wrapper { display: none; }
-    .dark-mode-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.12); }
+    .dark-mode-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.12); opacity: 0.6; }
     .logout-btn { margin-top: 16px; width: 100%; }
     :host ::ng-deep .user-menu-panel { margin-bottom: 8px; }
   `],
