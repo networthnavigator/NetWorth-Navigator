@@ -55,3 +55,14 @@ public class TransactionLineDto
     public string? UserComments { get; set; }
     public string? Tag { get; set; }
 }
+
+/// <summary>One line in the upload preview report (before import).</summary>
+public class UploadPreviewLineDto
+{
+    public string? Date { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = "EUR";
+    /// <summary>"import" = will be imported, "skip" = duplicate or invalid</summary>
+    public string Action { get; set; } = "import";
+}

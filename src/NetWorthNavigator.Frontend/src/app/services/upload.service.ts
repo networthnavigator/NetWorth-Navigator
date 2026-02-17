@@ -6,6 +6,7 @@ import {
   UploadConfiguration,
   DetectResult,
   ImportResult,
+  PreviewResult,
 } from '../models/upload-config.model';
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +30,14 @@ export class UploadService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<DetectResult>(`${this.base}/detect`, form);
+  }
+
+  /** Preview import: returns counts and lines without saving. */
+  preview(file: File, configurationId: string): Observable<PreviewResult> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('configurationId', configurationId);
+    return this.http.post<PreviewResult>(`${this.base}/preview`, form);
   }
 
   import(file: File, configurationId: string): Observable<ImportResult> {

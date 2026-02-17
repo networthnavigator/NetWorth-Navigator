@@ -3,6 +3,7 @@ namespace NetWorthNavigator.Backend.Application.DTOs;
 public class BalanceSheetAccountDto
 {
     public int Id { get; set; }
+    public string? AccountNumber { get; set; }
     public string Name { get; set; } = "";
     public decimal CurrentBalance { get; set; }
     public string Currency { get; set; } = "EUR";
@@ -13,6 +14,7 @@ public class BalanceSheetAccountDto
 
 public class BalanceSheetAccountCreateUpdateDto
 {
+    public string? AccountNumber { get; set; }
     public string? Name { get; set; }
     public decimal? CurrentBalance { get; set; }
     public string? Currency { get; set; }

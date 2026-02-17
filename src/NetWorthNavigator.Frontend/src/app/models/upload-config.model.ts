@@ -26,4 +26,22 @@ export interface DetectResult {
 export interface ImportResult {
   imported: number;
   skipped: number;
+  /** Distinct OwnAccount values that appeared in the uploaded file. */
+  ownAccountsInFile?: string[];
+}
+
+export interface UploadPreviewLine {
+  date: string | null;
+  name: string;
+  amount: number;
+  currency: string;
+  /** "import" | "skip" */
+  action: string;
+}
+
+export interface PreviewResult {
+  readyForImport: number;
+  toSkip: number;
+  lines: UploadPreviewLine[];
+  ownAccountsInFile: string[];
 }

@@ -44,7 +44,7 @@ html.theme-dark {
   app-tree-node .node-actions button:hover {
     color: var(--mat-sys-tertiary, #69f0ae) !important;
   }
-  // Stroked/outlined buttons (Vul schema, Nieuwe categorie)
+  // Stroked/outlined buttons (e.g. Chart of accounts, New category)
   app-rekening-schema .mat-mdc-button.mat-mdc-outlined-button {
     color: rgba(255, 255, 255, 0.87) !important;
     border-color: rgba(255, 255, 255, 0.38) !important;

@@ -17,6 +17,7 @@ export class AssetsLiabilitiesService {
   }
   createAccount(item: Partial<BalanceSheetAccount>): Observable<BalanceSheetAccount> {
     const body = {
+      accountNumber: item.accountNumber ?? null,
       name: item.name,
       currentBalance: item.currentBalance ?? 0,
       currency: item.currency ?? 'EUR',
@@ -26,6 +27,7 @@ export class AssetsLiabilitiesService {
   }
   updateAccount(item: BalanceSheetAccount): Observable<BalanceSheetAccount> {
     const body = {
+      accountNumber: item.accountNumber ?? null,
       name: item.name,
       currentBalance: item.currentBalance,
       currency: item.currency,

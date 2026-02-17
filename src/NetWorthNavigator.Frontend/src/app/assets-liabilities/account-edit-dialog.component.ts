@@ -25,6 +25,11 @@ export interface AccountEditData {
     <mat-dialog-content>
       <form class="form">
         <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Account number</mat-label>
+          <input matInput [(ngModel)]="form.accountNumber" name="accountNumber" placeholder="e.g. IBAN">
+          <mat-hint>Optional. Leave empty for cash pots.</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
           <mat-label>Name</mat-label>
           <input matInput [(ngModel)]="form.name" name="name" required>
         </mat-form-field>
@@ -82,12 +87,14 @@ export class AccountEditDialogComponent implements OnInit {
 
   form = this.data.item
     ? {
+        accountNumber: this.data.item.accountNumber ?? '',
         name: this.data.item.name,
         currentBalance: this.data.item.currentBalance,
         currency: this.data.item.currency,
         ledgerAccountId: this.data.item.ledgerAccountId ?? null,
       }
     : {
+        accountNumber: '',
         name: this.data.initialName ?? '',
         currentBalance: 0,
         currency: 'EUR',
@@ -100,6 +107,7 @@ export class AccountEditDialogComponent implements OnInit {
 
   save(): void {
     this.ref.close({
+      accountNumber: this.form.accountNumber?.trim() || null,
       name: this.form.name.trim(),
       currentBalance: this.fromTransactions() ? 0 : Number(this.form.currentBalance),
       currency: this.form.currency,

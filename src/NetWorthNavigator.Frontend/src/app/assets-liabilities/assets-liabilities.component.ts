@@ -62,6 +62,11 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
         </mat-card-header>
         <mat-card-content>
           <table mat-table [dataSource]="accounts()" class="full-width">
+            <ng-container matColumnDef="accountNumber">
+              <th mat-header-cell *matHeaderCellDef>Account number</th>
+              <td mat-cell *matCellDef="let row" class="mono">{{ row.accountNumber || '—' }}</td>
+              <td mat-footer-cell *matFooterCellDef class="total-row"></td>
+            </ng-container>
             <ng-container matColumnDef="name">
               <th mat-header-cell *matHeaderCellDef>Name</th>
               <td mat-cell *matCellDef="let row">{{ row.name }}</td>
@@ -85,7 +90,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             @if (accounts().length > 2) {
               <tr mat-footer-row *matFooterRowDef="accountColumns"></tr>
             }
-            <tr class="mat-row" *matNoDataRow><td class="mat-cell" colspan="3">No accounts yet. Add one to get started.</td></tr>
+            <tr class="mat-row" *matNoDataRow><td class="mat-cell" colspan="4">No accounts yet. Add one to get started.</td></tr>
           </table>
 
           @if (ownAccountsToAdd().length > 0) {
@@ -288,6 +293,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
     .section mat-card-header button .material-symbols-outlined { font-size: 20px; vertical-align: middle; margin-right: 4px; }
     .header-actions button .material-symbols-outlined { font-size: 20px; vertical-align: middle; margin-right: 4px; }
     .full-width { width: 100%; }
+    .full-width .mono { font-family: ui-monospace, monospace; font-size: 0.9rem; }
     .total-row { font-weight: 500; border-top: 1px solid rgba(0,0,0,0.12); }
     html.theme-dark .total-row { border-top-color: rgba(255,255,255,0.12); }
     .own-accounts-from-transactions {
@@ -344,7 +350,7 @@ export class AssetsLiabilitiesComponent implements OnInit {
       .reduce((sum, m) => sum + this.calculateCurrentMortgageValue(m), 0)
   );
 
-  accountColumns = ['name', 'currentBalance', 'actions'];
+  accountColumns = ['accountNumber', 'name', 'currentBalance', 'actions'];
   investmentAccountColumns = ['name', 'currentBalance', 'actions'];
   propertyColumns = ['name', 'purchaseDate', 'purchaseValue', 'estimatedValue', 'actions'];
   mortgageColumns = ['name', 'startValue', 'interestStartDate', 'termYears', 'currentRate', 'fixedPeriod', 'currentValue', 'extraPaidOff', 'isPaidOff', 'actions'];

@@ -176,6 +176,7 @@ using (var scope = app.Services.CreateScope())
         db.Database.ExecuteSqlRaw(@"
             CREATE TABLE BalanceSheetAccounts (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                AccountNumber TEXT,
                 Name TEXT NOT NULL,
                 CurrentBalance REAL NOT NULL DEFAULT 0,
                 Currency TEXT NOT NULL DEFAULT 'EUR',
@@ -188,6 +189,10 @@ using (var scope = app.Services.CreateScope())
             "SELECT COUNT(*) AS Value FROM pragma_table_info('BalanceSheetAccounts') WHERE name = 'LedgerAccountId'").OrderBy(x => x).FirstOrDefault() > 0;
         if (!hasLedgerAccountId)
             db.Database.ExecuteSqlRaw("ALTER TABLE BalanceSheetAccounts ADD COLUMN LedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id)");
+        var hasAccountNumber = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) AS Value FROM pragma_table_info('BalanceSheetAccounts') WHERE name = 'AccountNumber'").OrderBy(x => x).FirstOrDefault() > 0;
+        if (!hasAccountNumber)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BalanceSheetAccounts ADD COLUMN AccountNumber TEXT");
     }
 
     var hasInvestmentAccounts = db.Database.SqlQueryRaw<int>(

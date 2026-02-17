@@ -33,6 +33,7 @@ public sealed class AccountsApplicationService : IAccountsApplicationService
         var nextOrder = await _accounts.GetNextSortOrderAsync(ct);
         var entity = new BalanceSheetAccount
         {
+            AccountNumber = string.IsNullOrWhiteSpace(dto.AccountNumber) ? null : dto.AccountNumber.Trim(),
             Name = dto.Name ?? "",
             CurrentBalance = dto.CurrentBalance ?? 0,
             Currency = dto.Currency ?? "EUR",
@@ -47,6 +48,7 @@ public sealed class AccountsApplicationService : IAccountsApplicationService
     {
         var existing = await _accounts.GetByIdAsync(id, ct);
         if (existing == null) return null;
+        if (dto.AccountNumber != null) existing.AccountNumber = string.IsNullOrWhiteSpace(dto.AccountNumber) ? null : dto.AccountNumber.Trim();
         if (dto.Name != null) existing.Name = dto.Name;
         if (dto.CurrentBalance.HasValue) existing.CurrentBalance = dto.CurrentBalance.Value;
         if (dto.Currency != null) existing.Currency = dto.Currency;
@@ -70,6 +72,7 @@ public sealed class AccountsApplicationService : IAccountsApplicationService
         return new BalanceSheetAccountDto
         {
             Id = a.Id,
+            AccountNumber = a.AccountNumber,
             Name = a.Name,
             CurrentBalance = a.CurrentBalance,
             Currency = a.Currency,

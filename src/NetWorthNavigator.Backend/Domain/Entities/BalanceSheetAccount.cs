@@ -4,6 +4,8 @@ namespace NetWorthNavigator.Backend.Domain.Entities;
 public class BalanceSheetAccount
 {
     public int Id { get; set; }
+    /// <summary>Optional account number (e.g. IBAN) from imports; used to match transaction OwnAccount.</summary>
+    public string? AccountNumber { get; set; }
     public string Name { get; set; } = string.Empty;
     public decimal CurrentBalance { get; set; }
     public string Currency { get; set; } = "EUR";

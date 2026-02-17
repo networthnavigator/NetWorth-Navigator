@@ -13,6 +13,8 @@ import { LedgerService } from '../services/ledger.service';
 export interface LedgerAccountEditData {
   item?: LedgerAccount;
   accountClasses: AccountClassOption[];
+  /** When creating, preselect this account class. */
+  initialAccountStructureId?: number;
 }
 
 @Component({
@@ -40,7 +42,7 @@ export interface LedgerAccountEditData {
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Code</mat-label>
+          <mat-label>Account number</mat-label>
           <input matInput [(ngModel)]="form.code" name="code" placeholder="e.g. 1101" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="full-width">
@@ -73,7 +75,7 @@ export class LedgerAccountEditDialogComponent {
         name: this.data.item.name,
       }
     : {
-        accountStructureId: this.data.accountClasses[0]?.id ?? 0,
+        accountStructureId: this.data.initialAccountStructureId ?? this.data.accountClasses[0]?.id ?? 0,
         code: '',
         name: '',
       };

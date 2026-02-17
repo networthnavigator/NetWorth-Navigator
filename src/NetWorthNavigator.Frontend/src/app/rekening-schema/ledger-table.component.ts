@@ -27,7 +27,7 @@ import {
     </div>
     <table mat-table [dataSource]="accounts()" class="ledger-table">
       <ng-container matColumnDef="code">
-        <th mat-header-cell *matHeaderCellDef>Code</th>
+        <th mat-header-cell *matHeaderCellDef>Account number</th>
         <td mat-cell *matCellDef="let row">{{ row.code }}</td>
       </ng-container>
       <ng-container matColumnDef="name">

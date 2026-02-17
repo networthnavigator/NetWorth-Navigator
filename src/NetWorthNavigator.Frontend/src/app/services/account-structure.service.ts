@@ -19,6 +19,10 @@ export class AccountStructureService {
     return this.http.get<AccountStructure[]>(`${this.base}/used`);
   }
 
+  getFullStructure(): Observable<AccountStructure[]> {
+    return this.http.get<AccountStructure[]>(`${this.base}/full`);
+  }
+
   getAccountClasses(): Observable<AccountClassOption[]> {
     return this.http.get<AccountClassOption[]>(`${this.base}/account-classes`);
   }

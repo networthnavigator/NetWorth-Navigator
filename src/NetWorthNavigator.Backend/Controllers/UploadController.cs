@@ -108,6 +108,37 @@ public class UploadController : ControllerBase
         return Ok(new { detected = true, configurationId = configId, configuration = config });
     }
 
+    /// <summary>POST /api/upload/preview - Preview import: return counts and line list without saving</summary>
+    [HttpPost("preview")]
+    [RequestSizeLimit(10 * 1024 * 1024)] // 10MB
+    public async Task<ActionResult<object>> Preview(
+        [FromForm] IFormFile? file,
+        [FromForm] string configurationId,
+        CancellationToken ct)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "No file provided" });
+        if (string.IsNullOrWhiteSpace(configurationId))
+            return BadRequest(new { error = "configurationId is required" });
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var (readyForImport, toSkip, lines, ownAccountsInFile) = await _importService.PreviewAsync(
+                stream, configurationId, ct);
+            return Ok(new
+            {
+                readyForImport,
+                toSkip,
+                lines,
+                ownAccountsInFile = ownAccountsInFile.ToList(),
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     /// <summary>POST /api/upload/import - Import CSV with given configuration</summary>
     [HttpPost("import")]
     [RequestSizeLimit(10 * 1024 * 1024)] // 10MB
@@ -123,9 +154,9 @@ public class UploadController : ControllerBase
         try
         {
             await using var stream = file.OpenReadStream();
-            var (imported, skipped) = await _importService.ImportAsync(
+            var (imported, skipped, ownAccountsInFile) = await _importService.ImportAsync(
                 stream, configurationId, file.FileName, ct);
-            return Ok(new { imported, skipped });
+            return Ok(new { imported, skipped, ownAccountsInFile = ownAccountsInFile.ToList() });
         }
         catch (ArgumentException ex)
         {

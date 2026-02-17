@@ -1,10 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AccountStructureService } from '../services/account-structure.service';
 import { LedgerService } from '../services/ledger.service';
@@ -12,20 +14,20 @@ import { ChartOfAccountsSeedService } from '../services/ledger.service';
 import { AccountStructure } from '../models/account-structure.model';
 import { LedgerAccount } from '../models/ledger-account.model';
 import { AccountStructureTreeComponent } from './account-structure-tree.component';
-import { LedgerTableComponent } from './ledger-table.component';
 
 @Component({
   selector: 'app-rekening-schema',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatCardModule,
     MatButtonModule,
     MatTooltipModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    MatSlideToggleModule,
     AccountStructureTreeComponent,
-    LedgerTableComponent,
   ],
   template: `
     <mat-card>
@@ -52,23 +54,25 @@ import { LedgerTableComponent } from './ledger-table.component';
           <p class="loading"><mat-spinner diameter="24"></mat-spinner> Loading...</p>
         } @else {
           <section class="structure-section">
-            <h3>Structure (in use)</h3>
-            <p class="section-desc">Fixed chart of accounts structure. Only categories with ledger accounts are shown.</p>
+            <div class="section-header">
+              <h3>Structure &amp; ledger accounts</h3>
+              <label class="toggle-label">
+                <mat-slide-toggle [(ngModel)]="showStructureWithoutLedgers" (ngModelChange)="onToggleStructureWithoutLedgers()">
+                  Show structure without ledgers
+                </mat-slide-toggle>
+              </label>
+            </div>
+            <p class="section-desc">Structure with ledger accounts per account class. Expand an account class to see or add ledgers. The range (e.g. 12300–12399) is indicative: you can use more digits (12301, 12302, …) for more than 10 accounts in the same class.</p>
             @if (structure().length === 0) {
-              <p class="empty">Add ledger accounts below to see the structure here.</p>
+              <p class="empty">Add ledger accounts in the structure below to see them here.</p>
             } @else {
-              <app-account-structure-tree [tree]="structure()" />
+              <app-account-structure-tree
+                [tree]="structure()"
+                [ledgerAccounts]="ledgerAccounts()"
+                (saved)="load()"
+                (deleted)="load()"
+              />
             }
-          </section>
-
-          <section class="ledger-section">
-            <h3>Ledger accounts</h3>
-            <p class="section-desc">Your accounts. Add, edit, or delete as needed.</p>
-            <app-ledger-table
-              [accounts]="ledgerAccounts()"
-              (saved)="load()"
-              (deleted)="load()"
-            />
           </section>
         }
       </mat-card-content>
@@ -81,9 +85,12 @@ import { LedgerTableComponent } from './ledger-table.component';
     .loading, .empty, .error { padding: 24px; color: #757575; }
     .error { color: #c62828; }
     .loading { display: flex; align-items: center; gap: 8px; }
-    .structure-section, .ledger-section { margin-top: 24px; }
-    .structure-section h3, .ledger-section h3 { margin: 0 0 8px 0; font-size: 1.1em; }
-    .section-desc { margin: 0 0 12px 0; color: #757575; font-size: 0.9em; }
+    .structure-section { margin-top: 24px; }
+    .structure-section h3 { margin: 0 0 8px 0; font-size: 1.1em; }
+    .section-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .section-header h3 { margin: 0; }
+    .toggle-label { display: flex; align-items: center; font-size: 14px; }
+    .section-desc { margin: 8px 0 12px 0; color: #757575; font-size: 0.9em; }
     .structure-section .empty { padding: 16px 0; }
   `],
 })
@@ -97,6 +104,8 @@ export class RekeningSchemaComponent implements OnInit {
   readonly ledgerAccounts = signal<LedgerAccount[]>([]);
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
+  /** When true, show full structure (including nodes with no ledgers). */
+  showStructureWithoutLedgers = false;
 
   ngOnInit() {
     this.load();
@@ -105,8 +114,11 @@ export class RekeningSchemaComponent implements OnInit {
   load() {
     this.loadError.set(null);
     this.loading.set(true);
+    const structure$ = this.showStructureWithoutLedgers
+      ? this.structureService.getFullStructure()
+      : this.structureService.getUsedStructure();
     forkJoin({
-      structure: this.structureService.getUsedStructure(),
+      structure: structure$,
       ledger: this.ledgerService.getAll(),
     }).subscribe({
       next: ({ structure, ledger }) => {
@@ -117,6 +129,24 @@ export class RekeningSchemaComponent implements OnInit {
       },
       error: (err) => {
         this.loadError.set(err?.error?.error ?? err?.message ?? 'Error loading. Ensure the backend is running.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  onToggleStructureWithoutLedgers(): void {
+    this.loadError.set(null);
+    this.loading.set(true);
+    const structure$ = this.showStructureWithoutLedgers
+      ? this.structureService.getFullStructure()
+      : this.structureService.getUsedStructure();
+    structure$.subscribe({
+      next: (structure) => {
+        this.structure.set(structure ?? []);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loadError.set(err?.error?.error ?? err?.message ?? 'Error loading structure.');
         this.loading.set(false);
       },
     });

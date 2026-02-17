@@ -55,6 +55,13 @@ import { THEMES, CURRENCIES } from '../../models/preferences.model';
             <span class="nav-label">Transactions</span>
           }
         </a>
+        <a routerLink="/bookings" routerLinkActive="active"
+           [matTooltip]="collapsed() ? 'Bookings' : null" class="nav-item">
+          <span class="material-symbols-outlined nav-icon">receipt_long</span>
+          @if (!collapsed()) {
+            <span class="nav-label">Bookings</span>
+          }
+        </a>
         <a routerLink="/chart-of-accounts" routerLinkActive="active"
            [matTooltip]="collapsed() ? 'Chart of accounts' : null" class="nav-item">
           <span class="material-symbols-outlined nav-icon">account_balance</span>

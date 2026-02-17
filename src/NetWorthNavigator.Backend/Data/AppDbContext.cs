@@ -101,6 +101,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<BalanceSheetAccount>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.AccountNumber).HasMaxLength(64);
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.CurrentBalance).HasPrecision(18, 2);
             entity.Property(e => e.Currency).HasMaxLength(3);

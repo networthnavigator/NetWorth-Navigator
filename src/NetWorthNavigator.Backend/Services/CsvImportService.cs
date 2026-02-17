@@ -173,7 +173,7 @@ public class CsvImportService
         return null;
     }
 
-    public async Task<(int Imported, int Skipped)> ImportAsync(
+    public async Task<(int Imported, int Skipped, IReadOnlyList<string> OwnAccountsInFile)> ImportAsync(
         Stream csvStream,
         string configurationId,
         string fileName,
@@ -189,7 +189,7 @@ public class CsvImportService
 
         var headerLine = reader.ReadLine();
         if (string.IsNullOrWhiteSpace(headerLine))
-            return (0, 0);
+            return (0, 0, Array.Empty<string>());
 
         var headers = ParseCsvLine(headerLine, config.Delimiter);
         var headerNames = headers.Select(h => h.Trim().Trim('"')).ToArray();
@@ -224,8 +224,9 @@ public class CsvImportService
             .ToListAsync(ct);
         var existingKeys = new HashSet<string>(existingKeyList, StringComparer.OrdinalIgnoreCase);
 
-        // First pass: compute dedup key per line and count how often each key appears in this file.
+        // First pass: compute dedup key per line, count key frequency, and collect distinct OwnAccount values in file.
         var lineEntries = new List<(string Key, string Line)>();
+        var ownAccountsInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skippedInvalid = 0;
         foreach (var line in dataLines)
         {
@@ -234,6 +235,8 @@ public class CsvImportService
             if (documentLine == null) { skippedInvalid++; continue; }
             var key = documentLine.ExternalId ?? documentLine.Hash;
             lineEntries.Add((key, line));
+            if (!string.IsNullOrWhiteSpace(documentLine.OwnAccount))
+                ownAccountsInFile.Add(documentLine.OwnAccount.Trim());
         }
 
         var keyCountInFile = lineEntries
@@ -270,7 +273,117 @@ public class CsvImportService
         }
 
         await _context.SaveChangesAsync(ct);
-        return (imported, skipped);
+        return (imported, skipped, ownAccountsInFile.ToList().AsReadOnly());
+    }
+
+    /// <summary>Preview import: parse file and return what would be imported vs skipped, without saving.</summary>
+    public async Task<(int ReadyForImport, int ToSkip, IReadOnlyList<UploadPreviewLineDto> Lines, IReadOnlyList<string> OwnAccountsInFile)> PreviewAsync(
+        Stream csvStream,
+        string configurationId,
+        CancellationToken ct = default)
+    {
+        var config = AllConfigurations.FirstOrDefault(c =>
+            c.Id.Equals(configurationId, StringComparison.OrdinalIgnoreCase));
+        if (config == null)
+            throw new ArgumentException($"Configuration '{configurationId}' not found.");
+
+        csvStream.Position = 0;
+        using var reader = new StreamReader(csvStream, Encoding.UTF8, leaveOpen: true);
+
+        var headerLine = reader.ReadLine();
+        if (string.IsNullOrWhiteSpace(headerLine))
+            return (0, 0, Array.Empty<UploadPreviewLineDto>(), Array.Empty<string>());
+
+        var headers = ParseCsvLine(headerLine, config.Delimiter);
+        var headerNames = headers.Select(h => h.Trim().Trim('"')).ToArray();
+
+        var dataLines = new List<string>();
+        while (reader.ReadLine() is { } line)
+        {
+            if (!string.IsNullOrWhiteSpace(line))
+                dataLines.Add(line);
+        }
+
+        var dummyDocId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var user = "User";
+
+        var existingKeyList = await _context.TransactionDocumentLines
+            .Select(l => l.ExternalId != null ? l.ExternalId : l.Hash)
+            .ToListAsync(ct);
+        var existingKeys = new HashSet<string>(existingKeyList, StringComparer.OrdinalIgnoreCase);
+
+        var lineEntries = new List<(string Key, string Line)>();
+        var ownAccountsInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in dataLines)
+        {
+            var row = LineToRow(line, config.Delimiter, headerNames);
+            var documentLine = MapToTransactionDocumentLine(config, row, dummyDocId, 0, now, user, line);
+            if (documentLine == null) continue;
+            var key = documentLine.ExternalId ?? documentLine.Hash;
+            lineEntries.Add((key, line));
+            if (!string.IsNullOrWhiteSpace(documentLine.OwnAccount))
+                ownAccountsInFile.Add(documentLine.OwnAccount.Trim());
+        }
+
+        var keyCountInFile = lineEntries
+            .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var previewLines = new List<UploadPreviewLineDto>();
+        var readyForImport = 0;
+        var toSkip = 0;
+        var lineNumber = 0;
+
+        foreach (var (key, line) in lineEntries)
+        {
+            var row = LineToRow(line, config.Delimiter, headerNames);
+            var documentLine = MapToTransactionDocumentLine(config, row, dummyDocId, lineNumber, now, user, line);
+            if (documentLine == null)
+            {
+                toSkip++;
+                previewLines.Add(new UploadPreviewLineDto
+                {
+                    Date = null,
+                    Name = "(invalid row)",
+                    Amount = 0,
+                    Currency = config.Currency ?? "EUR",
+                    Action = "skip",
+                });
+                continue;
+            }
+
+            var name = documentLine.ContraAccountName ?? documentLine.Description ?? documentLine.ContraAccount ?? "";
+            var wouldSkip = existingKeys.Contains(key) && keyCountInFile[key] <= 1;
+            if (wouldSkip)
+            {
+                toSkip++;
+                previewLines.Add(new UploadPreviewLineDto
+                {
+                    Date = documentLine.Date.ToString("yyyy-MM-dd"),
+                    Name = name,
+                    Amount = documentLine.Amount,
+                    Currency = documentLine.Currency,
+                    Action = "skip",
+                });
+            }
+            else
+            {
+                readyForImport++;
+                existingKeys.Add(key);
+                previewLines.Add(new UploadPreviewLineDto
+                {
+                    Date = documentLine.Date.ToString("yyyy-MM-dd"),
+                    Name = name,
+                    Amount = documentLine.Amount,
+                    Currency = documentLine.Currency,
+                    Action = "import",
+                });
+                lineNumber++;
+            }
+        }
+
+        return (readyForImport, toSkip, previewLines, ownAccountsInFile.ToList().AsReadOnly());
     }
 
     private static Dictionary<string, string> LineToRow(string line, string delimiter, string[] headerNames)

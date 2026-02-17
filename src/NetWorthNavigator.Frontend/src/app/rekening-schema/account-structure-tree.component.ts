@@ -1,8 +1,18 @@
-import { Component, input, signal, computed } from '@angular/core';
+import { Component, input, output, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { AccountStructure } from '../models/account-structure.model';
+import { LedgerAccount } from '../models/ledger-account.model';
+import { AccountStructureService } from '../services/account-structure.service';
+import { LedgerService } from '../services/ledger.service';
+import {
+  LedgerAccountEditDialogComponent,
+  LedgerAccountEditData,
+} from './ledger-account-edit-dialog.component';
 
 interface TableRow {
   path: AccountStructure[];
@@ -15,7 +25,12 @@ const MAX_LEVEL = 4;
 @Component({
   selector: 'app-account-structure-tree',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatTooltipModule],
+  imports: [
+    CommonModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+  ],
   template: `
     <div class="bulk-actions">
       <button mat-stroked-button (click)="collapseAll()" matTooltip="Collapse all">
@@ -37,6 +52,7 @@ const MAX_LEVEL = 4;
             @if (maxDepth() >= 4) {
               <th>Sub-class</th>
             }
+            <th>Ledgers</th>
           </tr>
         </thead>
         <tbody>
@@ -62,11 +78,55 @@ const MAX_LEVEL = 4;
                       }
                       <span class="cell-label">{{ getCellName(row, col) }}</span>
                       @if (getCellCode(row, col)) {
-                        <span class="code">{{ row.path[col].code }}</span>
+                        <span class="code">{{ codeToRange(row.path[col].code) }}</span>
                       }
                     </div>
                   </td>
                 }
+              }
+              @if (row.leaf) {
+                <td class="ledgers-cell">
+                  <div class="account-class-cell">
+                    <div class="account-class-header">
+                      <button
+                        mat-icon-button
+                        class="expand-btn"
+                        (click)="toggleLedgersCollapse(row.leaf!.id)"
+                        [matTooltip]="isLedgersCollapsed(row.leaf!.id) ? 'Show ledgers' : 'Hide ledgers'"
+                      >
+                        <span class="material-symbols-outlined">
+                          {{ isLedgersCollapsed(row.leaf!.id) ? 'expand_more' : 'expand_less' }}
+                        </span>
+                      </button>
+                      <span class="ledger-count">({{ getLedgers(row.leaf!.id).length }})</span>
+                      <button mat-stroked-button class="add-ledger-btn" (click)="addLedger(row.leaf!.id)" matTooltip="New ledger">
+                        <span class="material-symbols-outlined">add</span>
+                        New ledger
+                      </button>
+                    </div>
+                    @if (!isLedgersCollapsed(row.leaf!.id)) {
+                      <div class="ledger-list">
+                        @for (ledger of getLedgers(row.leaf!.id); track ledger.id) {
+                          <div class="ledger-row">
+                            <span class="ledger-code">{{ ledger.code }}</span>
+                            <span class="ledger-name">{{ ledger.name }}</span>
+                            <button mat-icon-button (click)="editLedger(ledger)" matTooltip="Edit">
+                              <span class="material-symbols-outlined">edit</span>
+                            </button>
+                            <button mat-icon-button (click)="deleteLedger(ledger)" matTooltip="Delete">
+                              <span class="material-symbols-outlined">delete</span>
+                            </button>
+                          </div>
+                        }
+                        @if (getLedgers(row.leaf!.id).length === 0) {
+                          <p class="no-ledgers">No ledgers. Click "New ledger" to add one.</p>
+                        }
+                      </div>
+                    }
+                  </div>
+                </td>
+              } @else {
+                <td class="ledgers-cell ledgers-cell-empty"></td>
               }
             </tr>
           }
@@ -101,11 +161,35 @@ const MAX_LEVEL = 4;
     .expand-btn .material-symbols-outlined { font-size: 18px; }
     .expand-placeholder { display: inline-block; }
     .cell-label { flex: 1; min-width: 0; }
+    .ledgers-cell { padding: 6px 12px; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,0.06); min-width: 280px; }
+    html.theme-dark .ledgers-cell { border-color: rgba(255,255,255,0.08); }
+    .ledgers-cell-empty { background: transparent; }
+    .account-class-cell { display: flex; flex-direction: column; gap: 8px; }
+    .account-class-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .account-class-header .expand-btn { flex-shrink: 0; }
+    .ledger-count { font-size: 0.9em; color: #757575; }
+    .add-ledger-btn .material-symbols-outlined { font-size: 18px; margin-right: 4px; }
+    .ledger-list { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; border-left: 2px solid rgba(0,0,0,0.08); }
+    html.theme-dark .ledger-list { border-color: rgba(255,255,255,0.12); }
+    .ledger-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+    .ledger-row .ledger-code { font-family: monospace; min-width: 48px; }
+    .ledger-row .ledger-name { flex: 1; min-width: 0; }
+    .no-ledgers { margin: 8px 0 0 0; font-size: 0.9em; color: #757575; }
   `],
 })
 export class AccountStructureTreeComponent {
   readonly tree = input.required<AccountStructure[]>();
+  readonly ledgerAccounts = input<LedgerAccount[]>([]);
+  readonly saved = output<void>();
+  readonly deleted = output<void>();
+
   private readonly collapsed = signal<Set<number>>(new Set());
+  /** Account class ids for which the ledger list is collapsed. */
+  private readonly collapsedLedgers = signal<Set<number>>(new Set());
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly accountStructureService = inject(AccountStructureService);
+  private readonly ledgerService = inject(LedgerService);
 
   readonly maxDepth = computed(() => {
     let max = 0;
@@ -225,6 +309,17 @@ export class AccountStructureTreeComponent {
     return node ? node.code : undefined;
   }
 
+  /** Convert structure code to 5-digit display range (e.g. "1" → 10000–19999, "123" → 12300–12399). */
+  codeToRange(code: string): string {
+    if (!code || !/^\d+$/.test(code)) return code;
+    const len = code.length;
+    if (len >= 5) return code;
+    const pad = 5 - len;
+    const low = code + '0'.repeat(pad);
+    const high = code + '9'.repeat(pad);
+    return `${low}-${high}`;
+  }
+
   getRowKey(row: TableRow, index: number): string | number {
     if (row.leaf) return row.leaf.id;
     if (row.collapsedAtLevel !== undefined) {
@@ -232,5 +327,66 @@ export class AccountStructureTreeComponent {
       return `c-${node?.id ?? index}`;
     }
     return index;
+  }
+
+  getLedgers(accountStructureId: number): LedgerAccount[] {
+    return this.ledgerAccounts().filter((l) => l.accountStructureId === accountStructureId);
+  }
+
+  isLedgersCollapsed(accountClassId: number): boolean {
+    return this.collapsedLedgers().has(accountClassId);
+  }
+
+  toggleLedgersCollapse(accountClassId: number): void {
+    this.collapsedLedgers.update((s) => {
+      const n = new Set(s);
+      if (n.has(accountClassId)) n.delete(accountClassId);
+      else n.add(accountClassId);
+      return n;
+    });
+  }
+
+  addLedger(accountClassId: number): void {
+    this.accountStructureService.getAccountClasses().subscribe({
+      next: (classes) => {
+        const ref = this.dialog.open(LedgerAccountEditDialogComponent, {
+          data: {
+            accountClasses: classes,
+            initialAccountStructureId: accountClassId,
+          } as LedgerAccountEditData,
+          width: '420px',
+        });
+        ref.afterClosed().subscribe((r) => {
+          if (r) this.saved.emit();
+        });
+      },
+    });
+  }
+
+  editLedger(ledger: LedgerAccount): void {
+    this.accountStructureService.getAccountClasses().subscribe({
+      next: (classes) => {
+        const ref = this.dialog.open(LedgerAccountEditDialogComponent, {
+          data: { item: ledger, accountClasses: classes } as LedgerAccountEditData,
+          width: '420px',
+        });
+        ref.afterClosed().subscribe((r) => {
+          if (r) this.saved.emit();
+        });
+      },
+    });
+  }
+
+  deleteLedger(ledger: LedgerAccount): void {
+    if (!confirm(`Delete "${ledger.name}"?`)) return;
+    this.ledgerService.delete(ledger.id).subscribe({
+      next: () => {
+        this.snackBar.open('Ledger deleted', undefined, { duration: 3000 });
+        this.deleted.emit();
+      },
+      error: (err) => {
+        this.snackBar.open(err?.error?.error ?? err?.message ?? 'Delete failed', undefined, { duration: 5000 });
+      },
+    });
   }
 }

@@ -10,6 +10,8 @@ import { UploadService } from '../services/upload.service';
 import {
   Bank,
   UploadConfiguration,
+  ImportResult,
+  PreviewResult,
 } from '../models/upload-config.model';
 import {
   UploadConfigDialogComponent,
@@ -20,6 +22,9 @@ import {
   UploadConfigWizardInput,
 } from './upload-config-wizard.component';
 import { AddBankDialogComponent, AddBankResult } from './add-bank-dialog.component';
+import { AddUnknownAccountsWizardComponent } from './add-unknown-accounts-wizard.component';
+import { UploadReportDialogComponent, UploadReportDialogData } from './upload-report-dialog.component';
+import { AssetsLiabilitiesService } from '../services/assets-liabilities.service';
 import { DUTCH_BANKS } from '../models/banks.model';
 
 function getDefaultBanks(): AddBankResult[] {
@@ -202,6 +207,9 @@ function getDefaultBanks(): AddBankResult[] {
             @if (detecting()) {
               <p class="detecting"><mat-spinner diameter="20"></mat-spinner> Analysing file…</p>
             }
+            @if (previewing()) {
+              <p class="detecting"><mat-spinner diameter="20"></mat-spinner> Building preview…</p>
+            }
           </div>
 
           <div class="actions">
@@ -210,14 +218,14 @@ function getDefaultBanks(): AddBankResult[] {
               mat-raised-button
               color="primary"
               type="button"
-              (click)="onUpload()"
-              [disabled]="!canUpload() || uploading()"
+              (click)="onPreview()"
+              [disabled]="!canUpload() || uploading() || previewing()"
             >
-              @if (uploading()) {
+              @if (previewing()) {
                 <mat-spinner diameter="20"></mat-spinner>
-                Importing…
+                Preview…
               } @else {
-                Upload
+                Preview
               }
             </button>
           </div>
@@ -478,6 +486,7 @@ export class UploadComponent implements OnInit {
   private readonly uploadService = inject(UploadService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
+  private readonly assetsLiabilitiesService = inject(AssetsLiabilitiesService);
 
   /** Seeded with ING NL by default. */
   readonly addedBanks = signal<AddBankResult[]>(getDefaultBanks());
@@ -500,6 +509,7 @@ export class UploadComponent implements OnInit {
   readonly detectedConfig = signal<UploadConfiguration | null>(null);
   readonly detecting = signal(false);
   readonly uploading = signal(false);
+  readonly previewing = signal(false);
   readonly isDragOver = signal(false);
   readonly confirmedForUpload = signal(false);
   readonly unknownFilePrompt = signal(false);
@@ -749,28 +759,63 @@ export class UploadComponent implements OnInit {
     return true;
   }
 
-  onUpload() {
+  onPreview() {
     const file = this.selectedFile();
     const config = this.selectedConfig();
     if (!file || !config) return;
-    this.uploading.set(true);
-    this.uploadService.import(file, config.id).subscribe({
-      next: (r) => {
-        this.uploading.set(false);
-        this.clearFile();
+    this.previewing.set(true);
+    this.uploadService.preview(file, config.id).subscribe({
+      next: (preview) => {
+        this.previewing.set(false);
+        const ref = this.dialog.open(UploadReportDialogComponent, {
+          data: {
+            file,
+            configurationId: config.id,
+            configName: config.name,
+            preview,
+          } as UploadReportDialogData,
+          width: '720px',
+          maxHeight: '90vh',
+        });
+        ref.afterClosed().subscribe((importResult?: ImportResult) => {
+          if (importResult) {
+            this.clearFile();
+            this.openAddUnknownAccountsWizardIfNeeded(importResult);
+          }
+        });
+      },
+      error: (err) => {
+        this.previewing.set(false);
         this.snackBar.open(
-          `${r.imported} transactions imported${r.skipped > 0 ? `, ${r.skipped} skipped (duplicates)` : ''}`,
+          err?.error?.error ?? 'Preview failed',
           undefined,
           { duration: 4000 }
         );
       },
-      error: (err) => {
-        this.uploading.set(false);
-        this.snackBar.open(
-          err?.error?.error ?? 'Import failed',
-          undefined,
-          { duration: 4000 }
-        );
+    });
+  }
+
+  private openAddUnknownAccountsWizardIfNeeded(importResult: { ownAccountsInFile?: string[] }): void {
+    const inFile = importResult.ownAccountsInFile ?? [];
+    if (inFile.length === 0) return;
+    this.assetsLiabilitiesService.getAccounts().subscribe({
+      next: (accounts) => {
+        const knownSet = new Set<string>();
+        accounts.forEach(a => {
+          if (a.accountNumber?.trim()) knownSet.add(a.accountNumber.trim().toLowerCase());
+          if (a.name?.trim()) knownSet.add(a.name.trim().toLowerCase());
+        });
+        const unknown = inFile.filter(oa => {
+          const s = (oa || '').trim();
+          return s && !knownSet.has(s.toLowerCase());
+        });
+        if (unknown.length > 0) {
+          this.dialog.open(AddUnknownAccountsWizardComponent, {
+            width: '560px',
+            maxWidth: '95vw',
+            data: { unknownAccounts: unknown },
+          });
+        }
       },
     });
   }
@@ -800,7 +845,7 @@ export class UploadComponent implements OnInit {
                 this.addBankFromCatalog(res.configuration!.bankId);
               if (added) this._selectedAddedBank.set(added);
               this.confirmedForUpload.set(true);
-              this.onUpload();
+              this.onPreview();
             } else {
               this.unknownFilePrompt.set(true);
             }

@@ -13,6 +13,42 @@ public class BookingsController : ControllerBase
 
     public BookingsController(AppDbContext context) => _context = context;
 
+    /// <summary>GET /api/bookings - All bookings with their lines and ledger account info. For UI to show bookings and detect out-of-balance.</summary>
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<BookingWithLinesDto>>> GetAll(CancellationToken ct = default)
+    {
+        var bookings = await _context.Bookings
+            .Include(b => b.Lines)
+            .ThenInclude(l => l.LedgerAccount)
+            .OrderByDescending(b => b.Date)
+            .ThenBy(b => b.Reference)
+            .ToListAsync(ct);
+
+        var dtos = bookings.Select(b => new BookingWithLinesDto
+        {
+            Id = b.Id,
+            Date = b.Date,
+            Reference = b.Reference,
+            SourceDocumentLineId = b.SourceDocumentLineId,
+            DateCreated = b.DateCreated,
+            CreatedByUser = b.CreatedByUser,
+            Lines = b.Lines.OrderBy(l => l.LineNumber).Select(l => new BookingLineDto
+            {
+                Id = l.Id,
+                LineNumber = l.LineNumber,
+                LedgerAccountId = l.LedgerAccountId,
+                LedgerAccountCode = l.LedgerAccount?.Code,
+                LedgerAccountName = l.LedgerAccount?.Name,
+                DebitAmount = l.DebitAmount,
+                CreditAmount = l.CreditAmount,
+                Currency = l.Currency,
+                Description = l.Description,
+            }).ToList(),
+        }).ToList();
+
+        return Ok(dtos);
+    }
+
     /// <summary>POST /api/bookings/from-line - PoC: Create a booking from a transaction document line. Optionally applies first matching business rule for the contra ledger account.</summary>
     [HttpPost("from-line")]
     public async Task<ActionResult<object>> CreateFromDocumentLine(
@@ -137,4 +173,28 @@ public class CreateBookingFromLineRequest
     public int? OwnAccountLedgerId { get; set; }
     /// <summary>Ledger account for the contra side. If null, first matching BusinessRule is used.</summary>
     public int? ContraLedgerAccountId { get; set; }
+}
+
+public class BookingWithLinesDto
+{
+    public Guid Id { get; set; }
+    public DateTime Date { get; set; }
+    public string Reference { get; set; } = "";
+    public Guid? SourceDocumentLineId { get; set; }
+    public DateTime DateCreated { get; set; }
+    public string CreatedByUser { get; set; } = "";
+    public List<BookingLineDto> Lines { get; set; } = new();
+}
+
+public class BookingLineDto
+{
+    public Guid Id { get; set; }
+    public int LineNumber { get; set; }
+    public int LedgerAccountId { get; set; }
+    public string? LedgerAccountCode { get; set; }
+    public string? LedgerAccountName { get; set; }
+    public decimal DebitAmount { get; set; }
+    public decimal CreditAmount { get; set; }
+    public string Currency { get; set; } = "EUR";
+    public string? Description { get; set; }
 }

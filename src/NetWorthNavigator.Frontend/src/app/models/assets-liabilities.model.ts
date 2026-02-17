@@ -1,5 +1,6 @@
 export interface BalanceSheetAccount {
   id: number;
+  accountNumber?: string | null;
   name: string;
   currentBalance: number;
   currency: string;
