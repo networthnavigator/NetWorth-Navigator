@@ -50,20 +50,27 @@ export interface AccountEditData {
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Link to ledger account (Assets)</mat-label>
-          <mat-select [(ngModel)]="form.ledgerAccountId" name="ledgerAccountId">
-            <mat-option [value]="null">— None —</mat-option>
-            @for (la of assetsLedgerAccounts; track la.id) {
-              <mat-option [value]="la.id">{{ la.code }} {{ la.name }}</mat-option>
+          <mat-label>Ledger account (Assets)</mat-label>
+          <mat-select [(ngModel)]="form.ledgerAccountId" name="ledgerAccountId" required>
+            @if (assetsLedgerAccounts.length === 0) {
+              <mat-option [value]="null" disabled>— No ledger accounts yet —</mat-option>
+            } @else {
+              @for (la of assetsLedgerAccounts; track la.id) {
+                <mat-option [value]="la.id">{{ la.code }} {{ la.name }}</mat-option>
+              }
             }
           </mat-select>
-          <mat-hint>Only accounts from the Assets category are shown.</mat-hint>
+          @if (assetsLedgerAccounts.length === 0) {
+            <mat-hint>Create at least one ledger account under Assets in Chart of accounts first.</mat-hint>
+          } @else {
+            <mat-hint>Required. Only accounts from the Assets category are shown.</mat-hint>
+          }
         </mat-form-field>
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>Cancel</button>
-      <button mat-raised-button color="primary" (click)="save()" [disabled]="!form.name.trim()">Save</button>
+      <button mat-raised-button color="primary" (click)="save()" [disabled]="!canSave()">Save</button>
     </mat-dialog-actions>
   `,
   styles: [`
@@ -103,6 +110,10 @@ export class AccountEditDialogComponent implements OnInit {
 
   ngOnInit(): void {
     this.ledgerService.getAssets().subscribe((list) => (this.assetsLedgerAccounts = list));
+  }
+
+  canSave(): boolean {
+    return !!this.form.name?.trim() && !!this.form.ledgerAccountId;
   }
 
   save(): void {

@@ -63,6 +63,12 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Reference).HasMaxLength(256);
             entity.Property(e => e.CreatedByUser).HasMaxLength(128);
+            entity.Property(e => e.RequiresReview).HasConversion<int>();
+            entity.HasOne<TransactionDocumentLine>()
+                .WithMany()
+                .HasForeignKey(e => e.SourceDocumentLineId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         });
         modelBuilder.Entity<BookingLine>(entity =>
         {
@@ -78,11 +84,13 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.LedgerAccount).WithMany().HasForeignKey(e => e.LedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.SecondLedgerAccount).WithMany().HasForeignKey(e => e.SecondLedgerAccountId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.MatchField).HasMaxLength(64);
             entity.Property(e => e.MatchOperator).HasMaxLength(32);
             entity.Property(e => e.MatchValue).HasMaxLength(256);
             entity.Property(e => e.IsActive).HasConversion<int>();
+            entity.Property(e => e.RequiresReview).HasConversion<int>();
         });
         modelBuilder.Entity<AccountStructure>(entity =>
         {

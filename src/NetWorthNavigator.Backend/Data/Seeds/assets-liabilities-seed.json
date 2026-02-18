@@ -32,7 +32,12 @@
       "Name": "huis",
       "PurchaseValue": 700000.0,
       "Currency": "EUR",
-      "SortOrder": 1
+      "SortOrder": 1,
+      "Valuations": [
+        { "ValuationDate": "2024-01-15T00:00:00", "Value": 695000 },
+        { "ValuationDate": "2024-07-01T00:00:00", "Value": 710000 },
+        { "ValuationDate": "2025-01-10T00:00:00", "Value": 720000 }
+      ]
     }
   ],
   "Mortgages": [

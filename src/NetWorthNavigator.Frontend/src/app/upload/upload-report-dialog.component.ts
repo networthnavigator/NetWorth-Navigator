@@ -1,13 +1,15 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { UploadService } from '../services/upload.service';
+import { AssetsLiabilitiesService } from '../services/assets-liabilities.service';
 import { PreviewResult } from '../models/upload-config.model';
 import { getCurrencySymbol } from '../models/preferences.model';
+import { AddUnknownAccountsWizardComponent } from './add-unknown-accounts-wizard.component';
 
 export interface UploadReportDialogData {
   file: File;
@@ -30,6 +32,29 @@ export interface UploadReportDialogData {
     <h2 mat-dialog-title>Check imported bookings</h2>
     <mat-dialog-content>
       <p class="intro">Review the preview below. Documents marked as "import" will be saved when you click <strong>Import bookings</strong>.</p>
+
+      @if (missingAccounts().length > 0 || unlinkedAccounts().length > 0) {
+        <div class="accounts-required">
+          <p class="required-intro">Every own account in the file must exist in <strong>My accounts</strong> and be linked to a ledger before you can import.</p>
+          @if (missingAccounts().length > 0) {
+            <p class="required-list"><strong>Add these accounts:</strong></p>
+            <ul class="account-list">
+              @for (acc of missingAccounts(); track acc) {
+                <li><span class="mono">{{ acc }}</span></li>
+              }
+            </ul>
+            <button mat-stroked-button (click)="openAddAccountsWizard()">Add accounts</button>
+          }
+          @if (unlinkedAccounts().length > 0) {
+            <p class="required-list"><strong>Link these in Assets &amp; Liabilities:</strong></p>
+            <ul class="account-list">
+              @for (acc of unlinkedAccounts(); track acc) {
+                <li><span class="mono">{{ acc }}</span></li>
+              }
+            </ul>
+          }
+        </div>
+      }
 
       <div class="summary-cards">
         <div class="summary-card ready">
@@ -82,7 +107,7 @@ export interface UploadReportDialogData {
         mat-raised-button
         color="primary"
         (click)="importBookings()"
-        [disabled]="importing() || data.preview.readyForImport === 0"
+        [disabled]="importing() || !canImport()"
       >
         Import bookings
       </button>
@@ -111,17 +136,94 @@ export interface UploadReportDialogData {
     .action-badge.import { background: rgba(46, 125, 50, 0.12); color: #2e7d32; }
     .action-badge.skip { background: rgba(237, 108, 2, 0.12); color: #ed6c02; }
     .importing { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; }
+    .accounts-required {
+      margin-bottom: 20px; padding: 16px; background: rgba(237, 108, 2, 0.08); border: 1px solid rgba(237, 108, 2, 0.3); border-radius: 8px;
+    }
+    .required-intro { margin: 0 0 12px; font-size: 0.95rem; }
+    .required-list { margin: 8px 0 4px; font-size: 0.9rem; }
+    .account-list { margin: 4px 0 12px; padding-left: 24px; }
+    .account-list .mono { font-family: ui-monospace, monospace; }
   `],
 })
-export class UploadReportDialogComponent {
+export class UploadReportDialogComponent implements OnInit {
   private readonly dialogRef = inject(MatDialogRef<UploadReportDialogComponent>);
   private readonly uploadService = inject(UploadService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly assetsService = inject(AssetsLiabilitiesService);
+  private readonly matDialog = inject(MatDialog);
   readonly data = inject<UploadReportDialogData>(MAT_DIALOG_DATA);
 
   readonly importing = signal(false);
+  readonly missingAccounts = signal<string[]>([]);
+  readonly unlinkedAccounts = signal<string[]>([]);
 
   displayedColumns = ['date', 'name', 'amount', 'action'];
+
+  canImport(): boolean {
+    return this.data.preview.readyForImport > 0 &&
+      this.missingAccounts().length === 0 &&
+      this.unlinkedAccounts().length === 0;
+  }
+
+  ngOnInit(): void {
+    this.refreshAccountCheck();
+  }
+
+  refreshAccountCheck(): void {
+    const inFile = this.data.preview.ownAccountsInFile ?? [];
+    if (inFile.length === 0) {
+      this.missingAccounts.set([]);
+      this.unlinkedAccounts.set([]);
+      return;
+    }
+    this.assetsService.getAccounts().subscribe({
+      next: (accounts) => {
+        // Match file "own account" by account name or accountNumber (e.g. IBAN)
+        const linkedSet = new Set<string>();
+        const presentSet = new Set<string>();
+        accounts.forEach(a => {
+          const keyName = (a.name ?? '').trim().toLowerCase();
+          const keyNum = (a.accountNumber ?? '').trim().toLowerCase();
+          if (keyName) {
+            presentSet.add(keyName);
+            if (a.ledgerAccountId != null) linkedSet.add(keyName);
+          }
+          if (keyNum) {
+            presentSet.add(keyNum);
+            if (a.ledgerAccountId != null) linkedSet.add(keyNum);
+          }
+        });
+        const missing: string[] = [];
+        const unlinked: string[] = [];
+        inFile.forEach(oa => {
+          const s = (oa ?? '').trim();
+          if (!s) return;
+          const key = s.toLowerCase();
+          if (linkedSet.has(key)) return; // OK: exists and linked
+          if (presentSet.has(key)) unlinked.push(s);
+          else missing.push(s);
+        });
+        this.missingAccounts.set(missing);
+        this.unlinkedAccounts.set(unlinked);
+      },
+      error: () => {
+        this.missingAccounts.set(this.data.preview.ownAccountsInFile ?? []);
+        this.unlinkedAccounts.set([]);
+      },
+    });
+  }
+
+  openAddAccountsWizard(): void {
+    const unknown = this.missingAccounts();
+    if (unknown.length === 0) return;
+    this.matDialog.open(AddUnknownAccountsWizardComponent, {
+      width: '560px',
+      maxWidth: '95vw',
+      data: { unknownAccounts: unknown },
+    }).afterClosed().subscribe((added) => {
+      if (added) this.refreshAccountCheck();
+    });
+  }
 
   formatAmount(value: number, currency: string): string {
     const sym = getCurrencySymbol(currency);
@@ -129,7 +231,7 @@ export class UploadReportDialogComponent {
   }
 
   importBookings(): void {
-    if (this.data.preview.readyForImport === 0) return;
+    if (!this.canImport()) return;
     this.importing.set(true);
     this.uploadService.import(this.data.file, this.data.configurationId).subscribe({
       next: (result) => {

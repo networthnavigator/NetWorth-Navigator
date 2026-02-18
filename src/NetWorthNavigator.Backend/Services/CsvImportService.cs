@@ -12,10 +12,15 @@ namespace NetWorthNavigator.Backend.Services;
 public class CsvImportService
 {
     private readonly AppDbContext _context;
+    private readonly BookingFromLineService _bookingFromLineService;
     private static readonly object _customConfigLock = new();
     private static List<UploadConfigurationDto>? _customConfigs;
 
-    public CsvImportService(AppDbContext context) => _context = context;
+    public CsvImportService(AppDbContext context, BookingFromLineService bookingFromLineService)
+    {
+        _context = context;
+        _bookingFromLineService = bookingFromLineService;
+    }
 
     public static IReadOnlyList<BankDto> Banks { get; } =
     [
@@ -204,6 +209,77 @@ public class CsvImportService
         var now = DateTime.UtcNow;
         var user = "User";
 
+        // First pass: compute dedup key per line, count key frequency, and collect distinct OwnAccount values in file (no document yet).
+        var lineEntries = new List<(string Key, string Line)>();
+        var ownAccountsInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var skippedInvalid = 0;
+        foreach (var line in dataLines)
+        {
+            var row = LineToRow(line, config.Delimiter, headerNames);
+            var documentLine = MapToTransactionDocumentLine(config, row, Guid.Empty, 0, now, user, line);
+            if (documentLine == null) { skippedInvalid++; continue; }
+            var key = documentLine.ExternalId ?? documentLine.Hash;
+            lineEntries.Add((key, line));
+            if (!string.IsNullOrWhiteSpace(documentLine.OwnAccount))
+                ownAccountsInFile.Add(documentLine.OwnAccount.Trim());
+        }
+
+        // Require every OwnAccount to exist in BalanceSheetAccounts and be linked to a ledger (mandatory process).
+        // Match by Name or AccountNumber (e.g. IBAN). Normalize keys so BOM/whitespace don't break matching.
+        static string Norm(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "";
+            return s.Trim().Replace("\uFEFF", "", StringComparison.Ordinal); // BOM
+        }
+        var allAccounts = await _context.BalanceSheetAccounts
+            .AsNoTracking()
+            .Select(a => new { a.Name, a.AccountNumber, a.LedgerAccountId })
+            .ToListAsync(ct);
+        var existingSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var linkedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in allAccounts)
+        {
+            var nameKey = Norm(a.Name);
+            if (nameKey.Length > 0)
+            {
+                existingSet.Add(nameKey);
+                if (a.LedgerAccountId != null) linkedSet.Add(nameKey);
+            }
+            var numKey = Norm(a.AccountNumber);
+            if (numKey.Length > 0)
+            {
+                existingSet.Add(numKey);
+                if (a.LedgerAccountId != null) linkedSet.Add(numKey);
+            }
+        }
+        var missing = new List<string>();
+        var unlinked = new List<string>();
+        foreach (var oa in ownAccountsInFile)
+        {
+            var key = Norm(oa);
+            if (key.Length == 0) continue;
+            if (linkedSet.Contains(key)) continue;
+            if (existingSet.Contains(key))
+                unlinked.Add(key);
+            else
+                missing.Add(key);
+        }
+        if (missing.Count > 0 || unlinked.Count > 0)
+        {
+            var parts = new List<string>();
+            if (missing.Count > 0)
+                parts.Add("Add these accounts: " + string.Join(", ", missing.Distinct(StringComparer.OrdinalIgnoreCase)));
+            if (unlinked.Count > 0)
+                parts.Add("These accounts are in My accounts but not linked to a ledger (edit each in Assets & Liabilities and select a ledger): " + string.Join(", ", unlinked.Distinct(StringComparer.OrdinalIgnoreCase)));
+            throw new ArgumentException(string.Join(" ", parts));
+        }
+
+        // Dedup key = ExternalId when provided, otherwise Hash. Load existing keys from all document lines.
+        var existingKeyList = await _context.TransactionDocumentLines
+            .Select(l => l.ExternalId != null ? l.ExternalId : l.Hash)
+            .ToListAsync(ct);
+        var existingKeys = new HashSet<string>(existingKeyList, StringComparer.OrdinalIgnoreCase);
+
         // Header/line model: one document per file, N lines per document.
         var doc = new TransactionDocument
         {
@@ -217,27 +293,6 @@ public class CsvImportService
             Status = "Imported",
         };
         _context.TransactionDocuments.Add(doc);
-
-        // Dedup key = ExternalId when provided, otherwise Hash. Load existing keys from all document lines.
-        var existingKeyList = await _context.TransactionDocumentLines
-            .Select(l => l.ExternalId != null ? l.ExternalId : l.Hash)
-            .ToListAsync(ct);
-        var existingKeys = new HashSet<string>(existingKeyList, StringComparer.OrdinalIgnoreCase);
-
-        // First pass: compute dedup key per line, count key frequency, and collect distinct OwnAccount values in file.
-        var lineEntries = new List<(string Key, string Line)>();
-        var ownAccountsInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var skippedInvalid = 0;
-        foreach (var line in dataLines)
-        {
-            var row = LineToRow(line, config.Delimiter, headerNames);
-            var documentLine = MapToTransactionDocumentLine(config, row, doc.Id, 0, now, user, line);
-            if (documentLine == null) { skippedInvalid++; continue; }
-            var key = documentLine.ExternalId ?? documentLine.Hash;
-            lineEntries.Add((key, line));
-            if (!string.IsNullOrWhiteSpace(documentLine.OwnAccount))
-                ownAccountsInFile.Add(documentLine.OwnAccount.Trim());
-        }
 
         var keyCountInFile = lineEntries
             .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
@@ -262,6 +317,16 @@ public class CsvImportService
                 if (documentLine == null) { skipped++; continue; }
 
                 _context.TransactionDocumentLines.Add(documentLine);
+                try
+                {
+                    await _bookingFromLineService.CreateBookingForLineAsync(documentLine, doc, null, null, ct);
+                }
+                catch
+                {
+                    _context.TransactionDocumentLines.Remove(documentLine);
+                    skipped++;
+                    continue;
+                }
                 existingKeys.Add(key);
                 imported++;
                 lineNumber++;

@@ -122,13 +122,21 @@ export class MortgageEditDialogComponent {
     );
   }
 
+  /** Format date as YYYY-MM-DD using local date only (no timezone shift). */
+  private toDateOnlyString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}T00:00:00`;
+  }
+
   save(): void {
     if (!this.canSave()) return;
     const date = this.form.interestStartDate as Date;
     this.ref.close({
       name: this.form.name.trim(),
       startValue: Number(this.form.startValue),
-      interestStartDate: date.toISOString().slice(0, 10) + 'T00:00:00',
+      interestStartDate: this.toDateOnlyString(date),
       termYears: Number(this.form.termYears),
       currentInterestRate: Number(this.form.currentInterestRate),
       fixedRatePeriodYears: Number(this.form.fixedRatePeriodYears),

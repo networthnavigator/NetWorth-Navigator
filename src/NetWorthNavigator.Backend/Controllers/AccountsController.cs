@@ -22,16 +22,30 @@ public class AccountsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<BalanceSheetAccountDto>> Create([FromBody] BalanceSheetAccountCreateUpdateDto dto, CancellationToken ct)
     {
-        var result = await _service.CreateAsync(dto, ct);
-        return CreatedAtAction(nameof(GetAll), new { id = result.Id }, result);
+        try
+        {
+            var result = await _service.CreateAsync(dto, ct);
+            return CreatedAtAction(nameof(GetAll), new { id = result.Id }, result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPut("{id:int}")]
     public async Task<ActionResult<BalanceSheetAccountDto>> Update(int id, [FromBody] BalanceSheetAccountCreateUpdateDto dto, CancellationToken ct)
     {
-        var result = await _service.UpdateAsync(id, dto, ct);
-        if (result == null) return NotFound();
-        return Ok(result);
+        try
+        {
+            var result = await _service.UpdateAsync(id, dto, ct);
+            if (result == null) return NotFound();
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpDelete("{id:int}")]

@@ -53,7 +53,7 @@ import { AuthService } from '../services/auth.service';
           </div>
 
           <div class="feature-block">
-            <h3>Transactions &amp; upload</h3>
+            <h3>Bookings &amp; upload</h3>
             <p>
               Upload CSV exports from your bank, credit card, brokerage or crypto accounts. Map columns per file type and keep all transaction lines in one place. Manual entry (e.g. cash) is planned.
             </p>

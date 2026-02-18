@@ -66,6 +66,14 @@ export class PropertyEditDialogComponent {
       }
     : { name: '', purchaseValue: null as number | string | null, purchaseDate: null as Date | null, currency: 'EUR' };
 
+  /** Format date as YYYY-MM-DD using local date only (no timezone shift). */
+  private toDateOnlyString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}T00:00:00`;
+  }
+
   save(): void {
     const val = this.form.purchaseValue;
     const isEmpty = val === null || val === undefined || val === '';
@@ -74,7 +82,7 @@ export class PropertyEditDialogComponent {
     this.ref.close({
       name: this.form.name.trim(),
       purchaseValue: (numVal !== null && isNaN(numVal)) ? null : numVal,
-      purchaseDate: date ? date.toISOString().slice(0, 10) + 'T00:00:00' : null,
+      purchaseDate: date ? this.toDateOnlyString(date) : null,
       currency: this.form.currency,
     });
   }

@@ -83,6 +83,28 @@ public class AssetsLiabilitiesSeedService
                 });
                 propertiesCount++;
             }
+            await _context.SaveChangesAsync();
+
+            // Seed property valuations (after properties exist so we have Ids)
+            foreach (var item in data.Properties)
+            {
+                if (item.Valuations == null || item.Valuations.Count == 0) continue;
+                var property = await _context.Properties
+                    .FirstOrDefaultAsync(p => p.Name == (item.Name ?? "").Trim());
+                if (property == null) continue;
+
+                var sortOrder = 0;
+                foreach (var v in item.Valuations)
+                {
+                    _context.PropertyValuations.Add(new PropertyValuation
+                    {
+                        PropertyId = property.Id,
+                        ValuationDate = v.ValuationDate,
+                        Value = v.Value,
+                        SortOrder = sortOrder++,
+                    });
+                }
+            }
         }
 
         // Seed mortgages
@@ -152,19 +174,27 @@ public class AssetsLiabilitiesSeedService
             })
             .ToArrayAsync();
 
-        var properties = await _context.Properties
+        var propertyList = await _context.Properties
             .AsNoTracking()
             .OrderBy(p => p.SortOrder)
             .ThenBy(p => p.Name)
-            .Select(p => new PropertySeedItem
-            {
-                Name = p.Name,
-                PurchaseValue = p.PurchaseValue,
-                PurchaseDate = p.PurchaseDate,
-                Currency = p.Currency,
-                SortOrder = p.SortOrder,
-            })
-            .ToArrayAsync();
+            .ToListAsync();
+        var valuationsByProperty = await _context.PropertyValuations
+            .AsNoTracking()
+            .OrderBy(v => v.ValuationDate)
+            .ToListAsync();
+        var properties = propertyList.Select(p => new PropertySeedItem
+        {
+            Name = p.Name,
+            PurchaseValue = p.PurchaseValue,
+            PurchaseDate = p.PurchaseDate,
+            Currency = p.Currency,
+            SortOrder = p.SortOrder,
+            Valuations = valuationsByProperty
+                .Where(v => v.PropertyId == p.Id)
+                .Select(v => new PropertyValuationSeedItem { ValuationDate = v.ValuationDate, Value = v.Value })
+                .ToList(),
+        }).ToArray();
 
         var mortgages = await _context.Mortgages
             .AsNoTracking()
@@ -230,6 +260,13 @@ public class AssetsLiabilitiesSeedService
         public DateTime? PurchaseDate { get; set; }
         public string? Currency { get; set; }
         public int SortOrder { get; set; }
+        public List<PropertyValuationSeedItem>? Valuations { get; set; }
+    }
+
+    private sealed class PropertyValuationSeedItem
+    {
+        public DateTime ValuationDate { get; set; }
+        public decimal Value { get; set; }
     }
 
     private sealed class MortgageSeedItem

@@ -1,0 +1,27 @@
+# Dependencies and build outputs
+**/node_modules
+**/dist
+**/.angular
+**/bin
+**/obj
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+*.md
+
+# Keep frontend package-lock for npm ci
+**/package-lock.json
+!src/NetWorthNavigator.Frontend/package-lock.json
+
+# Tests (optional: include if you want to run tests in image)
+**/*.Tests
+**/coverage
+**/.pytest_cache
+**/__pycache__
+
+# Misc
+**/.DS_Store
+**/Thumbs.db

@@ -30,6 +30,11 @@ public sealed class AccountsApplicationService : IAccountsApplicationService
 
     public async Task<BalanceSheetAccountDto> CreateAsync(BalanceSheetAccountCreateUpdateDto dto, CancellationToken ct = default)
     {
+        if (!dto.LedgerAccountId.HasValue || dto.LedgerAccountId.Value <= 0)
+            throw new ArgumentException("Ledger account is required. Select an account from the Assets category in Chart of accounts.");
+        var ledger = await _ledger.GetByIdAsync(dto.LedgerAccountId.Value, ct);
+        if (ledger == null)
+            throw new ArgumentException("Selected ledger account was not found.");
         var nextOrder = await _accounts.GetNextSortOrderAsync(ct);
         var entity = new BalanceSheetAccount
         {
@@ -52,8 +57,19 @@ public sealed class AccountsApplicationService : IAccountsApplicationService
         if (dto.Name != null) existing.Name = dto.Name;
         if (dto.CurrentBalance.HasValue) existing.CurrentBalance = dto.CurrentBalance.Value;
         if (dto.Currency != null) existing.Currency = dto.Currency;
-        if (dto.LedgerAccountId.HasValue) existing.LedgerAccountId = dto.LedgerAccountId.Value == 0 ? null : dto.LedgerAccountId;
-        else if (dto.LedgerAccountId == null) existing.LedgerAccountId = null;
+        if (dto.LedgerAccountId.HasValue && dto.LedgerAccountId.Value > 0)
+        {
+            var ledger = await _ledger.GetByIdAsync(dto.LedgerAccountId.Value, ct);
+            if (ledger == null)
+                throw new ArgumentException("Selected ledger account was not found.");
+            existing.LedgerAccountId = dto.LedgerAccountId.Value;
+        }
+        else if (dto.LedgerAccountId == null || dto.LedgerAccountId == 0)
+        {
+            if (!existing.LedgerAccountId.HasValue)
+                throw new ArgumentException("Ledger account is required. Select an account from the Assets category.");
+            // Leave existing ledger as is when not provided (partial update)
+        }
         await _accounts.UpdateAsync(existing, ct);
         var updated = await _accounts.GetByIdAsync(id, ct);
         return updated == null ? null : MapToDto(updated);

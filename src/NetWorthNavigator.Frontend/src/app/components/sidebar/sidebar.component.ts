@@ -48,18 +48,18 @@ import { THEMES, CURRENCIES } from '../../models/preferences.model';
             <span class="nav-label">Upload</span>
           }
         </a>
-        <a routerLink="/transactions" routerLinkActive="active"
-           [matTooltip]="collapsed() ? 'Transactions' : null" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">swap_horiz</span>
-          @if (!collapsed()) {
-            <span class="nav-label">Transactions</span>
-          }
-        </a>
         <a routerLink="/bookings" routerLinkActive="active"
            [matTooltip]="collapsed() ? 'Bookings' : null" class="nav-item">
           <span class="material-symbols-outlined nav-icon">receipt_long</span>
           @if (!collapsed()) {
             <span class="nav-label">Bookings</span>
+          }
+        </a>
+        <a routerLink="/booking-rules" routerLinkActive="active"
+           [matTooltip]="collapsed() ? 'Automated booking rules' : null" class="nav-item">
+          <span class="material-symbols-outlined nav-icon">rule</span>
+          @if (!collapsed()) {
+            <span class="nav-label">Automated booking rules</span>
           }
         </a>
         <a routerLink="/chart-of-accounts" routerLinkActive="active"

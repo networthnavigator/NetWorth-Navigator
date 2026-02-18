@@ -2,7 +2,7 @@
 
 A personal finance application to track assets, liabilities, net worth, and transaction data from multiple sources. Import CSV from bank, credit card, brokerage or crypto; manage a chart of accounts and ledger; create double-entry bookings from transaction lines. Built with .NET 10, Angular 19, and Angular Material. Uses SQLite so no database setup is required.
 
-**Conventions:** Backend, database, and repo use English. Frontend uses British English with Euro as default currency.
+**Conventions:** Backend, database, and repo use English. Frontend uses British English with Euro as default currency. See [docs/DESIGN.md](docs/DESIGN.md) for frontend/UX design choices (e.g. pages vs dialogs).
 
 ## User Stories
 
@@ -88,7 +88,23 @@ npm start
 
 The app runs at `http://localhost:4200`. API requests are proxied to the backend via `proxy.conf.json`.
 
-### 3. Open in VS Code
+### Running with Docker
+
+From the project root you can build and run the app with Docker Compose in one command:
+
+```bash
+./up.sh
+```
+
+This builds the backend (.NET 10) and frontend (Angular 19) images, starts both containers, and persists the SQLite database in a Docker volume. Open **http://localhost:6000** for the app and **http://localhost:5000/swagger** for the API. Stop with:
+
+```bash
+docker compose down
+```
+
+Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose (v2).
+
+### Open in VS Code
 
 Open `NetWorthNavigator.code-workspace` for a multi-root workspace with Backend and Frontend folders.
 

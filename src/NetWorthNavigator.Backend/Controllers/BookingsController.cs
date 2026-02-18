@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Data;
 using NetWorthNavigator.Backend.Domain.Entities;
+using NetWorthNavigator.Backend.Services;
 
 namespace NetWorthNavigator.Backend.Controllers;
 
@@ -10,8 +11,13 @@ namespace NetWorthNavigator.Backend.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly BookingFromLineService _bookingFromLineService;
 
-    public BookingsController(AppDbContext context) => _context = context;
+    public BookingsController(AppDbContext context, BookingFromLineService bookingFromLineService)
+    {
+        _context = context;
+        _bookingFromLineService = bookingFromLineService;
+    }
 
     /// <summary>GET /api/bookings - All bookings with their lines and ledger account info. For UI to show bookings and detect out-of-balance.</summary>
     [HttpGet]
@@ -32,6 +38,8 @@ public class BookingsController : ControllerBase
             SourceDocumentLineId = b.SourceDocumentLineId,
             DateCreated = b.DateCreated,
             CreatedByUser = b.CreatedByUser,
+            RequiresReview = b.RequiresReview,
+            ReviewedAt = b.ReviewedAt,
             Lines = b.Lines.OrderBy(l => l.LineNumber).Select(l => new BookingLineDto
             {
                 Id = l.Id,
@@ -49,7 +57,56 @@ public class BookingsController : ControllerBase
         return Ok(dtos);
     }
 
-    /// <summary>POST /api/bookings/from-line - PoC: Create a booking from a transaction document line. Optionally applies first matching business rule for the contra ledger account.</summary>
+    /// <summary>GET /api/bookings/by-source-line/{documentLineId} - Booking (with lines) for a transaction document line, if any.</summary>
+    [HttpGet("by-source-line/{documentLineId:guid}")]
+    public async Task<ActionResult<BookingWithLinesDto>> GetBySourceDocumentLine(Guid documentLineId, CancellationToken ct = default)
+    {
+        var booking = await _context.Bookings
+            .Include(b => b.Lines)
+            .ThenInclude(l => l.LedgerAccount)
+            .FirstOrDefaultAsync(b => b.SourceDocumentLineId == documentLineId, ct);
+        if (booking == null)
+            return NotFound();
+
+        var dto = new BookingWithLinesDto
+        {
+            Id = booking.Id,
+            Date = booking.Date,
+            Reference = booking.Reference,
+            SourceDocumentLineId = booking.SourceDocumentLineId,
+            DateCreated = booking.DateCreated,
+            CreatedByUser = booking.CreatedByUser,
+            RequiresReview = booking.RequiresReview,
+            ReviewedAt = booking.ReviewedAt,
+            Lines = booking.Lines.OrderBy(l => l.LineNumber).Select(l => new BookingLineDto
+            {
+                Id = l.Id,
+                LineNumber = l.LineNumber,
+                LedgerAccountId = l.LedgerAccountId,
+                LedgerAccountCode = l.LedgerAccount?.Code,
+                LedgerAccountName = l.LedgerAccount?.Name,
+                DebitAmount = l.DebitAmount,
+                CreditAmount = l.CreditAmount,
+                Currency = l.Currency,
+                Description = l.Description,
+            }).ToList(),
+        };
+        return Ok(dto);
+    }
+
+    /// <summary>PUT /api/bookings/{id}/reviewed - Mark a booking as reviewed/approved by the user.</summary>
+    [HttpPut("{id:guid}/reviewed")]
+    public async Task<IActionResult> MarkReviewed(Guid id, CancellationToken ct = default)
+    {
+        var booking = await _context.Bookings.FindAsync([id], ct);
+        if (booking == null)
+            return NotFound(new { error = "Booking not found" });
+        booking.ReviewedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    /// <summary>POST /api/bookings/from-line - Create a booking from a transaction document line. Optionally applies first matching business rule for the contra ledger account.</summary>
     [HttpPost("from-line")]
     public async Task<ActionResult<object>> CreateFromDocumentLine(
         [FromBody] CreateBookingFromLineRequest request,
@@ -61,109 +118,82 @@ public class BookingsController : ControllerBase
         if (line == null)
             return NotFound(new { error = "Transaction document line not found" });
 
-        // Optional: resolve contra ledger account from business rules (e.g. ContraAccountName contains "Albert Heijn" -> Boodschappen)
-        int? contraLedgerAccountId = request.ContraLedgerAccountId;
-        if (contraLedgerAccountId == null)
+        try
         {
-            var rules = await _context.BusinessRules
-                .Include(r => r.LedgerAccount)
-                .Where(r => r.IsActive)
-                .OrderBy(r => r.SortOrder)
-                .ToListAsync(ct);
-            foreach (var rule in rules)
-            {
-                if (Matches(line, rule))
-                {
-                    contraLedgerAccountId = rule.LedgerAccountId;
-                    break;
-                }
-            }
+            var (booking, hasContraLine) = await _bookingFromLineService.CreateBookingForLineAsync(
+                line, null,
+                request.OwnAccountLedgerId,
+                request.ContraLedgerAccountId,
+                ct);
+            await _context.SaveChangesAsync(ct);
+            return Ok(new { bookingId = booking.Id, date = booking.Date, reference = booking.Reference, appliedRule = hasContraLine });
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 
-        if (contraLedgerAccountId == null)
-            return BadRequest(new { error = "No contra ledger account. Set ContraLedgerAccountId or add a matching BusinessRule." });
+    /// <summary>POST /api/bookings/{bookingId}/lines - Add a line to an existing booking.</summary>
+    [HttpPost("{bookingId}/lines")]
+    public async Task<ActionResult<BookingLineDto>> AddLine(
+        string bookingId,
+        [FromBody] AddBookingLineRequest request,
+        CancellationToken ct = default)
+    {
+        if (!Guid.TryParse(bookingId, out var bookingIdParsed))
+            return BadRequest(new { error = "Invalid booking ID format" });
 
-        var ledgerAccountExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == contraLedgerAccountId.Value, ct);
-        if (!ledgerAccountExists)
-            return BadRequest(new { error = "LedgerAccount not found" });
+        var booking = await _context.Bookings
+            .Include(b => b.Lines)
+            .ThenInclude(l => l.LedgerAccount)
+            .FirstOrDefaultAsync(b => b.Id == bookingIdParsed, ct);
+        if (booking == null)
+            return NotFound(new { error = "Booking not found" });
 
-        var booking = new Booking
+        var ledgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == request.LedgerAccountId, ct);
+        if (!ledgerExists)
+            return BadRequest(new { error = "Ledger account not found" });
+
+        var nextLineNumber = booking.Lines.Count > 0 ? booking.Lines.Max(l => l.LineNumber) + 1 : 0;
+        var line = new BookingLine
         {
             Id = Guid.NewGuid(),
-            Date = line.Date,
-            Reference = $"Import {line.Document?.SourceName ?? "?"} line {line.LineNumber}",
-            SourceDocumentLineId = line.Id,
-            DateCreated = DateTime.UtcNow,
-            CreatedByUser = "User",
+            BookingId = booking.Id,
+            LineNumber = nextLineNumber,
+            LedgerAccountId = request.LedgerAccountId,
+            DebitAmount = request.DebitAmount,
+            CreditAmount = request.CreditAmount,
+            Currency = request.Currency ?? "EUR",
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
         };
-        _context.Bookings.Add(booking);
-
-        // Line 1: debit or credit on a "bank" ledger account (we don't have BalanceSheetAccount->LedgerAccount here; use request.OwnAccountLedgerId if provided)
-        // Line 2: contra on the rule/resolved ledger account
-        var amount = Math.Abs(line.Amount);
-        if (request.OwnAccountLedgerId != null)
-        {
-            _context.BookingLines.Add(new BookingLine
-            {
-                Id = Guid.NewGuid(),
-                BookingId = booking.Id,
-                LineNumber = 0,
-                LedgerAccountId = request.OwnAccountLedgerId.Value,
-                DebitAmount = line.Amount > 0 ? amount : 0,
-                CreditAmount = line.Amount < 0 ? amount : 0,
-                Currency = line.Currency,
-                Description = line.Description,
-            });
-            _context.BookingLines.Add(new BookingLine
-            {
-                Id = Guid.NewGuid(),
-                BookingId = booking.Id,
-                LineNumber = 1,
-                LedgerAccountId = contraLedgerAccountId.Value,
-                DebitAmount = line.Amount < 0 ? amount : 0,
-                CreditAmount = line.Amount > 0 ? amount : 0,
-                Currency = line.Currency,
-                Description = line.ContraAccountName ?? line.ContraAccount,
-            });
-        }
-        else
-        {
-            // Single line: only the contra side (PoC; full double-entry would need OwnAccountLedgerId)
-            _context.BookingLines.Add(new BookingLine
-            {
-                Id = Guid.NewGuid(),
-                BookingId = booking.Id,
-                LineNumber = 0,
-                LedgerAccountId = contraLedgerAccountId.Value,
-                DebitAmount = line.Amount < 0 ? amount : 0,
-                CreditAmount = line.Amount > 0 ? amount : 0,
-                Currency = line.Currency,
-                Description = line.ContraAccountName ?? line.ContraAccount,
-            });
-        }
-
+        _context.BookingLines.Add(line);
         await _context.SaveChangesAsync(ct);
-        return Ok(new { bookingId = booking.Id, date = booking.Date, reference = booking.Reference, appliedRule = contraLedgerAccountId != null });
-    }
+        await _context.Entry(line).Reference(l => l.LedgerAccount).LoadAsync(ct);
 
-    private static bool Matches(TransactionDocumentLine line, BusinessRule rule)
-    {
-        var value = rule.MatchField.ToUpperInvariant() switch
+        var dto = new BookingLineDto
         {
-            "CONTRAACCOUNTNAME" => line.ContraAccountName ?? "",
-            "CONTRAACCOUNT" => line.ContraAccount ?? "",
-            "DESCRIPTION" => line.Description ?? "",
-            _ => line.ContraAccountName ?? "",
+            Id = line.Id,
+            LineNumber = line.LineNumber,
+            LedgerAccountId = line.LedgerAccountId,
+            LedgerAccountCode = line.LedgerAccount?.Code,
+            LedgerAccountName = line.LedgerAccount?.Name,
+            DebitAmount = line.DebitAmount,
+            CreditAmount = line.CreditAmount,
+            Currency = line.Currency,
+            Description = line.Description,
         };
-        var match = rule.MatchValue ?? "";
-        return rule.MatchOperator.ToUpperInvariant() switch
-        {
-            "CONTAINS" => value.Contains(match, StringComparison.OrdinalIgnoreCase),
-            "EQUALS" => string.Equals(value, match, StringComparison.OrdinalIgnoreCase),
-            "STARTSWITH" => value.StartsWith(match, StringComparison.OrdinalIgnoreCase),
-            _ => value.Contains(match, StringComparison.OrdinalIgnoreCase),
-        };
+        return Ok(dto);
     }
+}
+
+public class AddBookingLineRequest
+{
+    public int LedgerAccountId { get; set; }
+    public decimal DebitAmount { get; set; }
+    public decimal CreditAmount { get; set; }
+    public string? Currency { get; set; }
+    public string? Description { get; set; }
 }
 
 public class CreateBookingFromLineRequest
@@ -183,6 +213,8 @@ public class BookingWithLinesDto
     public Guid? SourceDocumentLineId { get; set; }
     public DateTime DateCreated { get; set; }
     public string CreatedByUser { get; set; } = "";
+    public bool RequiresReview { get; set; }
+    public DateTime? ReviewedAt { get; set; }
     public List<BookingLineDto> Lines { get; set; } = new();
 }
 

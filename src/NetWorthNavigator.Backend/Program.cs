@@ -15,6 +15,8 @@ builder.Services.AddScoped<AccountStructureImportService>();
 builder.Services.AddScoped<LedgerSeedService>();
 builder.Services.AddScoped<AssetsLiabilitiesSeedService>();
 builder.Services.AddScoped<CsvImportService>();
+builder.Services.AddScoped<BookingFromLineService>();
+builder.Services.AddScoped<BookingRulesSeedService>();
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
 builder.Services.AddEndpointsApiExplorer();
@@ -109,7 +111,9 @@ using (var scope = app.Services.CreateScope())
                 Reference TEXT NOT NULL,
                 SourceDocumentLineId TEXT REFERENCES TransactionDocumentLines(Id),
                 DateCreated TEXT NOT NULL,
-                CreatedByUser TEXT NOT NULL)");
+                CreatedByUser TEXT NOT NULL,
+                RequiresReview INTEGER NOT NULL DEFAULT 1,
+                ReviewedAt TEXT)");
     }
     var hasBookingLines = db.Database.SqlQueryRaw<int>(
         "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BookingLines'").OrderBy(x => x).FirstOrDefault() > 0;
@@ -138,8 +142,25 @@ using (var scope = app.Services.CreateScope())
                 MatchOperator TEXT NOT NULL DEFAULT 'Contains',
                 MatchValue TEXT NOT NULL,
                 LedgerAccountId INTEGER NOT NULL REFERENCES LedgerAccounts(Id),
+                SecondLedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id),
                 SortOrder INTEGER NOT NULL DEFAULT 0,
-                IsActive INTEGER NOT NULL DEFAULT 1)");
+                IsActive INTEGER NOT NULL DEFAULT 1,
+                RequiresReview INTEGER NOT NULL DEFAULT 1)");
+    }
+    // Migrate existing BusinessRules: add RequiresReview if missing
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) FROM pragma_table_info('BusinessRules') WHERE name='RequiresReview'").FirstOrDefault() == 0)
+        db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN RequiresReview INTEGER NOT NULL DEFAULT 1");
+    // Migrate existing BusinessRules: add SecondLedgerAccountId if missing
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) FROM pragma_table_info('BusinessRules') WHERE name='SecondLedgerAccountId'").FirstOrDefault() == 0)
+        db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN SecondLedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id)");
+
+    // Migrate existing Bookings: add RequiresReview and ReviewedAt if missing
+    if (hasBookings)
+    {
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) FROM pragma_table_info('Bookings') WHERE name='RequiresReview'").FirstOrDefault() == 0)
+            db.Database.ExecuteSqlRaw("ALTER TABLE Bookings ADD COLUMN RequiresReview INTEGER NOT NULL DEFAULT 1");
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) FROM pragma_table_info('Bookings') WHERE name='ReviewedAt'").FirstOrDefault() == 0)
+            db.Database.ExecuteSqlRaw("ALTER TABLE Bookings ADD COLUMN ReviewedAt TEXT");
     }
 
     var hasAccountStructures = db.Database.SqlQueryRaw<int>(
@@ -326,6 +347,52 @@ using (var scope = app.Services.CreateScope())
             await ledgerSeed.ImportFromJsonAsync(await File.ReadAllTextAsync(ledgerPath));
         }
     }
+
+    // Ensure OwnAccount rules exist for each BalanceSheetAccount that has a ledger link (so Automated booking rules page shows them)
+    var accountsWithLedger = await db.BalanceSheetAccounts.Where(a => a.LedgerAccountId != null).ToListAsync();
+    foreach (var acc in accountsWithLedger)
+    {
+        var nameMatch = (acc.Name ?? "").Trim();
+        if (string.IsNullOrEmpty(nameMatch)) continue;
+        var existsName = await db.BusinessRules.AnyAsync(r => r.MatchField == "OwnAccount" && r.MatchValue == nameMatch && r.LedgerAccountId == acc.LedgerAccountId);
+        if (!existsName)
+        {
+            db.BusinessRules.Add(new NetWorthNavigator.Backend.Domain.Entities.BusinessRule
+            {
+                Name = acc.Name ?? "",
+                MatchField = "OwnAccount",
+                MatchOperator = "Equals",
+                MatchValue = nameMatch,
+                LedgerAccountId = acc.LedgerAccountId!.Value,
+                SortOrder = 0,
+                IsActive = true,
+                RequiresReview = false,
+            });
+        }
+        if (acc.AccountNumber != null)
+        {
+            var numberMatch = acc.AccountNumber.Trim();
+            if (!string.IsNullOrEmpty(numberMatch) && !string.Equals(numberMatch, nameMatch, StringComparison.OrdinalIgnoreCase))
+            {
+                var existsNumber = await db.BusinessRules.AnyAsync(r => r.MatchField == "OwnAccount" && r.MatchValue == numberMatch && r.LedgerAccountId == acc.LedgerAccountId);
+                if (!existsNumber)
+                {
+                    db.BusinessRules.Add(new NetWorthNavigator.Backend.Domain.Entities.BusinessRule
+                    {
+                        Name = acc.Name + " (by number)",
+                        MatchField = "OwnAccount",
+                        MatchOperator = "Equals",
+                        MatchValue = numberMatch,
+                        LedgerAccountId = acc.LedgerAccountId!.Value,
+                        SortOrder = 0,
+                        IsActive = true,
+                        RequiresReview = false,
+                    });
+                }
+            }
+        }
+    }
+    await db.SaveChangesAsync();
 }
 
 app.UseSwagger();
