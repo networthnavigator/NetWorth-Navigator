@@ -224,55 +224,8 @@ public class CsvImportService
                 ownAccountsInFile.Add(documentLine.OwnAccount.Trim());
         }
 
-        // Require every OwnAccount to exist in BalanceSheetAccounts and be linked to a ledger (mandatory process).
-        // Match by Name or AccountNumber (e.g. IBAN). Normalize keys so BOM/whitespace don't break matching.
-        static string Norm(string? s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return "";
-            return s.Trim().Replace("\uFEFF", "", StringComparison.Ordinal); // BOM
-        }
-        var allAccounts = await _context.BalanceSheetAccounts
-            .AsNoTracking()
-            .Select(a => new { a.Name, a.AccountNumber, a.LedgerAccountId })
-            .ToListAsync(ct);
-        var existingSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var linkedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var a in allAccounts)
-        {
-            var nameKey = Norm(a.Name);
-            if (nameKey.Length > 0)
-            {
-                existingSet.Add(nameKey);
-                if (a.LedgerAccountId != null) linkedSet.Add(nameKey);
-            }
-            var numKey = Norm(a.AccountNumber);
-            if (numKey.Length > 0)
-            {
-                existingSet.Add(numKey);
-                if (a.LedgerAccountId != null) linkedSet.Add(numKey);
-            }
-        }
-        var missing = new List<string>();
-        var unlinked = new List<string>();
-        foreach (var oa in ownAccountsInFile)
-        {
-            var key = Norm(oa);
-            if (key.Length == 0) continue;
-            if (linkedSet.Contains(key)) continue;
-            if (existingSet.Contains(key))
-                unlinked.Add(key);
-            else
-                missing.Add(key);
-        }
-        if (missing.Count > 0 || unlinked.Count > 0)
-        {
-            var parts = new List<string>();
-            if (missing.Count > 0)
-                parts.Add("Add these accounts: " + string.Join(", ", missing.Distinct(StringComparer.OrdinalIgnoreCase)));
-            if (unlinked.Count > 0)
-                parts.Add("These accounts are in My accounts but not linked to a ledger (edit each in Assets & Liabilities and select a ledger): " + string.Join(", ", unlinked.Distinct(StringComparer.OrdinalIgnoreCase)));
-            throw new ArgumentException(string.Join(" ", parts));
-        }
+        // Only import lines for accounts that are tracked (BalanceSheetAccount with LedgerAccountId). Match by Name or AccountNumber.
+        var trackedOwnAccountKeys = await GetTrackedOwnAccountKeysAsync(ct);
 
         // Dedup key = ExternalId when provided, otherwise Hash. Load existing keys from all document lines.
         var existingKeyList = await _context.TransactionDocumentLines
@@ -315,6 +268,13 @@ public class CsvImportService
                 var row = LineToRow(line, config.Delimiter, headerNames);
                 var documentLine = MapToTransactionDocumentLine(config, row, doc.Id, lineNumber, now, user, line);
                 if (documentLine == null) { skipped++; continue; }
+
+                // Only import lines for accounts that are tracked (linked to a ledger)
+                if (!IsOwnAccountTracked(documentLine.OwnAccount, trackedOwnAccountKeys))
+                {
+                    skipped++;
+                    continue;
+                }
 
                 _context.TransactionDocumentLines.Add(documentLine);
                 try
@@ -395,6 +355,8 @@ public class CsvImportService
             .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Count());
 
+        var trackedOwnAccountKeys = await GetTrackedOwnAccountKeysAsync(ct);
+
         var previewLines = new List<UploadPreviewLineDto>();
         var readyForImport = 0;
         var toSkip = 0;
@@ -414,11 +376,29 @@ public class CsvImportService
                     Amount = 0,
                     Currency = config.Currency ?? "EUR",
                     Action = "skip",
+                    ActionReason = "Invalid row",
                 });
                 continue;
             }
 
             var name = documentLine.ContraAccountName ?? documentLine.Description ?? documentLine.ContraAccount ?? "";
+
+            // Only lines for tracked accounts (linked to a ledger) are imported
+            if (!IsOwnAccountTracked(documentLine.OwnAccount, trackedOwnAccountKeys))
+            {
+                toSkip++;
+                previewLines.Add(new UploadPreviewLineDto
+                {
+                    Date = documentLine.Date.ToString("yyyy-MM-dd"),
+                    Name = name,
+                    Amount = documentLine.Amount,
+                    Currency = documentLine.Currency,
+                    Action = "skip",
+                    ActionReason = "Account not tracked",
+                });
+                continue;
+            }
+
             var wouldSkip = existingKeys.Contains(key) && keyCountInFile[key] <= 1;
             if (wouldSkip)
             {
@@ -430,6 +410,7 @@ public class CsvImportService
                     Amount = documentLine.Amount,
                     Currency = documentLine.Currency,
                     Action = "skip",
+                    ActionReason = "Duplicate",
                 });
             }
             else
@@ -570,6 +551,38 @@ public class CsvImportService
                 return kv.Value;
         }
         return "";
+    }
+
+    /// <summary>Normalize own-account value for matching (BOM/whitespace).</summary>
+    private static string NormOwnAccount(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        return s.Trim().Replace("\uFEFF", "", StringComparison.Ordinal);
+    }
+
+    /// <summary>Set of normalized keys (Name or AccountNumber) for BalanceSheetAccounts that have a ledger link. Only lines for these accounts are imported.</summary>
+    private async Task<HashSet<string>> GetTrackedOwnAccountKeysAsync(CancellationToken ct)
+    {
+        var list = await _context.BalanceSheetAccounts
+            .AsNoTracking()
+            .Where(a => a.LedgerAccountId != null)
+            .Select(a => new { a.Name, a.AccountNumber })
+            .ToListAsync(ct);
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in list)
+        {
+            var nameKey = NormOwnAccount(a.Name);
+            if (nameKey.Length > 0) set.Add(nameKey);
+            var numKey = NormOwnAccount(a.AccountNumber);
+            if (numKey.Length > 0) set.Add(numKey);
+        }
+        return set;
+    }
+
+    private static bool IsOwnAccountTracked(string? ownAccount, HashSet<string> trackedKeys)
+    {
+        var key = NormOwnAccount(ownAccount);
+        return key.Length > 0 && trackedKeys.Contains(key);
     }
 
     private static string[] ParseCsvLine(string line, string delimiter)

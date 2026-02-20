@@ -12,8 +12,10 @@ public class BusinessRule
     public string MatchField { get; set; } = "ContraAccountName";
     /// <summary>Operator: "Contains", "Equals", "StartsWith".</summary>
     public string MatchOperator { get; set; } = "Contains";
-    /// <summary>Value to match (e.g. "Albert Heijn").</summary>
+    /// <summary>Value to match (e.g. "Albert Heijn"). When CriteriaJson is set, this is the first criterion's value (backward compat).</summary>
     public string MatchValue { get; set; } = string.Empty;
+    /// <summary>Optional JSON array of criteria: [{"matchField","matchOperator","matchValue"}]. When set, rule matches when ALL criteria match. Empty/null = use MatchField/MatchOperator/MatchValue only.</summary>
+    public string? CriteriaJson { get; set; }
     /// <summary>Ledger account to use for the contra booking (or first of two when SecondLedgerAccountId is set).</summary>
     public int LedgerAccountId { get; set; }
     public LedgerAccount? LedgerAccount { get; set; }
@@ -24,4 +26,6 @@ public class BusinessRule
     public bool IsActive { get; set; } = true;
     /// <summary>If true, bookings created with this rule should be reviewed by the user before considered approved. Default true for contra rules; OwnAccount (line 1) does not use rules.</summary>
     public bool RequiresReview { get; set; } = true;
+    /// <summary>When true, this rule was created automatically (e.g. OwnAccount per balance-sheet account) and cannot be edited or deleted. Excluded from conflict detection.</summary>
+    public bool IsSystemGenerated { get; set; }
 }

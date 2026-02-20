@@ -38,18 +38,20 @@ NetWorth Navigator/
 
 The backend follows **Clean Architecture** and **Domain Driven Design**. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
-## Build and test (CI-style)
+## Build Docker images (deployment)
 
 From the project root, run:
 
 ```bash
-./build.sh
+./BuildImage.sh
 ```
 
-This builds the solution, runs the **backend tests** (xUnit integration tests, including Ledger API create/delete), and builds the frontend. If any step fails, the script exits with code 1 so you can use it in CI or as a pre-commit check. Run this whenever you want to confirm nothing is broken.
+This builds the backend and frontend Docker images (versioned with timestamp), saves them to tar files, and creates a deployment package. See the script for output location and usage.
 
+For local build and tests without Docker:
+- Backend build: `dotnet build NetWorthNavigator.sln`
 - Backend tests: `dotnet test src/NetWorthNavigator.Backend.Tests/NetWorthNavigator.Backend.Tests.csproj`
-- Run only backend tests: `dotnet test src/NetWorthNavigator.Backend.Tests/NetWorthNavigator.Backend.Tests.csproj`
+- Frontend build: `cd src/NetWorthNavigator.Frontend && npm run build`
 
 ## Running the Application
 
@@ -88,19 +90,30 @@ npm start
 
 The app runs at `http://localhost:4200`. API requests are proxied to the backend via `proxy.conf.json`.
 
-### Running with Docker
+### Building Docker Images
 
-From the project root you can build and run the app with Docker Compose in one command:
-
-```bash
-./up.sh
-```
-
-This builds the backend (.NET 10) and frontend (Angular 19) images, starts both containers, and persists the SQLite database in a Docker volume. Open **http://localhost:6000** for the app and **http://localhost:5000/swagger** for the API. Stop with:
+To build versioned Docker images for deployment:
 
 ```bash
-docker compose down
+./BuildImage.sh
 ```
+
+This script:
+- Builds backend and frontend Docker images with version tags (format: `yyyymmdd.hhmmss`)
+- Saves images as tar files to `/home/ewout/Documents/NetWorth-Navigator-images`
+- Creates a `docker-compose.yml` for deployment
+- Archives old versions to the `archive` subfolder
+
+To load and run locally:
+
+```bash
+cd /home/ewout/Documents/NetWorth-Navigator-images
+docker load -i networth-navigator-backend-<version>.tar
+docker load -i networth-navigator-frontend-<version>.tar
+docker compose up -d
+```
+
+The app runs at **http://localhost:6000** and the API at **http://localhost:5000**. Stop with `docker compose down`.
 
 Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose (v2).
 

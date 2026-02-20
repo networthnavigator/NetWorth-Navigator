@@ -37,6 +37,8 @@ export interface UploadPreviewLine {
   currency: string;
   /** "import" | "skip" */
   action: string;
+  /** When action is "skip", e.g. "Account not tracked", "Duplicate", "Invalid row" */
+  actionReason?: string | null;
 }
 
 export interface PreviewResult {

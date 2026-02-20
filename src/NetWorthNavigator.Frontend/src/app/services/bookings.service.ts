@@ -41,4 +41,11 @@ export class BookingsService {
   markReviewed(bookingId: string): Observable<void> {
     return this.http.put<void>(`${this.apiUrl}/${bookingId}/reviewed`, {});
   }
+
+  /** Recreate bookings for the given scope so current rules are applied. Scope: ThisBooking (documentLineId required), PendingOnly, All. */
+  recreateByScope(scope: 'ThisBooking' | 'PendingOnly' | 'All', documentLineId?: string): Observable<{ processed: number; created: number; errors?: string[] }> {
+    const body: { scope: string; documentLineId?: string } = { scope };
+    if (scope === 'ThisBooking' && documentLineId) body.documentLineId = documentLineId;
+    return this.http.post<{ processed: number; created: number; errors?: string[] }>(`${this.apiUrl}/recreate-by-scope`, body);
+  }
 }

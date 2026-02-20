@@ -1,3 +1,9 @@
+export interface BookingRuleCriterion {
+  matchField: string;
+  matchOperator: string;
+  matchValue: string;
+}
+
 /** Rule to auto-assign the contra ledger when creating a booking from a transaction line (e.g. counterparty name contains "Albert Heijn" → ledger 4021). */
 export interface BookingRule {
   id: number;
@@ -5,6 +11,10 @@ export interface BookingRule {
   matchField: string;
   matchOperator: string;
   matchValue: string;
+  /** All criteria (when multiple). Rule matches when all criteria match. */
+  criteria?: BookingRuleCriterion[];
+  /** Ids of other rules that share at least one criterion (conflict). */
+  conflictRuleIds?: number[];
   ledgerAccountId: number;
   ledgerAccountCode?: string | null;
   ledgerAccountName?: string | null;
@@ -16,6 +26,8 @@ export interface BookingRule {
   isActive: boolean;
   /** When true, bookings created with this rule need user review before approved. Default true for contra rules. */
   requiresReview: boolean;
+  /** When true, rule was created automatically (e.g. OwnAccount) and is read-only; excluded from conflict detection. */
+  isSystemGenerated?: boolean;
 }
 
 export const MATCH_FIELDS: { id: string; label: string }[] = [

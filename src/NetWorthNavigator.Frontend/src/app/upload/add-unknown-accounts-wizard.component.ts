@@ -21,6 +21,7 @@ import { AccountStructureService } from '../services/account-structure.service';
 import { LedgerAccount } from '../models/ledger-account.model';
 import { AccountClassOption } from '../models/account-structure.model';
 import { BalanceSheetAccount } from '../models/assets-liabilities.model';
+import { LedgerAccountSelectComponent } from '../components/ledger-account-select/ledger-account-select.component';
 
 export interface AddUnknownAccountsWizardData {
   /** OwnAccount values from the file that are not yet in My accounts. */
@@ -31,8 +32,8 @@ interface AccountForm {
   accountNumber: string;
   name: string;
   ledgerAccountId: number | null;
-  /** When user creates a new ledger: chosen account class and new ledger details */
-  createNewLedger: boolean;
+  /** When true, show the "Create new ledger account" box for this row */
+  showCreateNewLedger: boolean;
   newLedgerAccountStructureId: number | null;
   newLedgerCode: string;
   newLedgerName: string;
@@ -50,6 +51,7 @@ interface AccountForm {
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    LedgerAccountSelectComponent,
   ],
   template: `
     <h2 mat-dialog-title>Add accounts from your upload</h2>
@@ -82,18 +84,19 @@ interface AccountForm {
                 <mat-label>Name</mat-label>
                 <input matInput [(ngModel)]="item.name" name="name{{i}}" placeholder="e.g. ING Current account" required>
               </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Ledger account (Assets)</mat-label>
-                <mat-select [(ngModel)]="item.ledgerAccountId" name="ledger{{i}}" required>
-                  <mat-option [value]="null">— Select —</mat-option>
-                  @for (la of assetsLedgerAccounts(); track la.id) {
-                    <mat-option [value]="la.id">{{ la.code }} {{ la.name }}</mat-option>
-                  }
-                  <mat-option [value]="createNewSentinel">➕ Create new ledger account</mat-option>
-                </mat-select>
-              </mat-form-field>
-
-              @if (item.ledgerAccountId === createNewSentinel) {
+              <app-ledger-account-select
+                [accounts]="assetsLedgerAccounts()"
+                [value]="item.ledgerAccountId"
+                (valueChange)="item.ledgerAccountId = $event"
+                label="Ledger account (Assets)*"
+                placeholder="Type to filter..."
+                hint="Link this balance sheet account to a ledger account for bookings."
+                [required]="!item.showCreateNewLedger"
+              />
+              <button mat-stroked-button type="button" class="create-new-link" (click)="item.showCreateNewLedger = true" [style.display]="item.showCreateNewLedger ? 'none' : 'inline-flex'">
+                ➕ Create new ledger account
+              </button>
+              @if (item.showCreateNewLedger) {
                 <div class="create-ledger-box">
                   <p class="create-ledger-title">Create new ledger account</p>
                   <p class="hint">Choose where in the structure this account belongs, then enter account number and name.</p>
@@ -157,6 +160,7 @@ interface AccountForm {
     .create-ledger-title { font-weight: 600; margin: 0 0 8px; }
     .hint { margin: 0 0 12px; font-size: 0.9rem; color: var(--mat-sys-on-surface-variant, #555); }
     .stepper-actions { margin-top: 16px; display: flex; gap: 8px; }
+    .create-new-link { margin-top: 4px; }
     mat-dialog-content { min-width: 420px; max-width: 560px; }
   `],
 })
@@ -179,7 +183,7 @@ export class AddUnknownAccountsWizardComponent implements OnInit {
         accountNumber: oa,
         name: this.suggestName(oa),
         ledgerAccountId: null as number | null,
-        createNewLedger: false,
+        showCreateNewLedger: false,
         newLedgerAccountStructureId: null as number | null,
         newLedgerCode: '',
         newLedgerName: '',
@@ -213,10 +217,7 @@ export class AddUnknownAccountsWizardComponent implements OnInit {
     const forms = this.accountForms();
     const item = forms[index];
     if (!item || !item.name.trim()) return false;
-    if (item.ledgerAccountId === null || item.ledgerAccountId === undefined) return false;
-    if (item.ledgerAccountId === this.createNewSentinel) {
-      return !!(item.newLedgerAccountStructureId && item.newLedgerCode?.trim() && item.newLedgerName?.trim());
-    }
+    if (item.ledgerAccountId == null || item.ledgerAccountId <= 0) return false;
     return true;
   }
 
@@ -225,12 +226,10 @@ export class AddUnknownAccountsWizardComponent implements OnInit {
     return !!(item?.newLedgerAccountStructureId && item.newLedgerCode?.trim() && item.newLedgerName?.trim());
   }
 
-  readonly createNewSentinel = -1;
-
   createLedgerForAccount(index: number): void {
     const forms = this.accountForms();
     const item = forms[index];
-    if (!item || item.ledgerAccountId !== this.createNewSentinel || !item.newLedgerAccountStructureId || !item.newLedgerCode?.trim() || !item.newLedgerName?.trim()) return;
+    if (!item || !item.newLedgerAccountStructureId || !item.newLedgerCode?.trim() || !item.newLedgerName?.trim()) return;
     this.ledgerService.create({
       accountStructureId: item.newLedgerAccountStructureId,
       code: item.newLedgerCode.trim(),
@@ -240,7 +239,7 @@ export class AddUnknownAccountsWizardComponent implements OnInit {
         this.assetsLedgerAccounts.update(list => [...list, created]);
         this.accountForms.update(list => {
           const copy = [...list];
-          copy[index] = { ...copy[index], ledgerAccountId: created.id, newLedgerCode: '', newLedgerName: '' };
+          copy[index] = { ...copy[index], ledgerAccountId: created.id, showCreateNewLedger: false, newLedgerCode: '', newLedgerName: '' };
           return copy;
         });
         this.snackBar.open('Ledger account created: ' + created.name, undefined, { duration: 3000 });
@@ -252,23 +251,20 @@ export class AddUnknownAccountsWizardComponent implements OnInit {
   allStepsValid(): boolean {
     const forms = this.accountForms();
     return forms.length > 0 && forms.every(f =>
-      f.name.trim() && f.ledgerAccountId != null && f.ledgerAccountId !== this.createNewSentinel
+      f.name.trim() && f.ledgerAccountId != null && f.ledgerAccountId > 0
     );
   }
 
   saveAll(): void {
     if (!this.allStepsValid() || this.saving()) return;
     const forms = this.accountForms();
-    const toCreate: Partial<BalanceSheetAccount>[] = forms.map(f => {
-      const ledgerId = f.ledgerAccountId === this.createNewSentinel ? null : f.ledgerAccountId;
-      return {
+    const toCreate: Partial<BalanceSheetAccount>[] = forms.map(f => ({
         accountNumber: f.accountNumber,
-        name: f.name.trim(),
-        currentBalance: 0,
-        currency: 'EUR',
-        ledgerAccountId: ledgerId ?? null,
-      };
-    });
+      name: f.name.trim(),
+      currentBalance: 0,
+      currency: 'EUR',
+      ledgerAccountId: f.ledgerAccountId ?? null,
+    }));
     this.saving.set(true);
     let done = 0;
     const total = toCreate.length;

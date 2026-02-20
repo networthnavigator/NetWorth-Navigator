@@ -8,7 +8,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { BalanceSheetAccount } from '../models/assets-liabilities.model';
 import { CURRENCIES } from '../models/preferences.model';
 import { LedgerService } from '../services/ledger.service';
+import { TransactionLinesService } from '../services/transaction-lines.service';
 import { LedgerAccount } from '../models/ledger-account.model';
+import { LedgerAccountSelectComponent } from '../components/ledger-account-select/ledger-account-select.component';
 
 export interface AccountEditData {
   item?: BalanceSheetAccount;
@@ -19,7 +21,7 @@ export interface AccountEditData {
 @Component({
   selector: 'app-account-edit-dialog',
   standalone: true,
-  imports: [FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [FormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, LedgerAccountSelectComponent],
   template: `
     <h2 mat-dialog-title>{{ data.item ? 'Edit account' : 'Add account' }}</h2>
     <mat-dialog-content>
@@ -34,11 +36,21 @@ export interface AccountEditData {
           <input matInput [(ngModel)]="form.name" name="name" required>
         </mat-form-field>
         @if (fromTransactions()) {
-          <p class="hint">Balance for this account is determined from your transactions. No need to enter a current balance.</p>
+          <p class="hint">Balance for this account is determined from your transactions. You can set an opening balance offset if your import does not cover the full history.</p>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Opening balance offset</mat-label>
+            <input matInput type="number" [(ngModel)]="form.openingBalanceOffset" name="openingBalanceOffset" placeholder="Optional">
+            <mat-hint>Balance before the first imported transaction. Pre-filled from "waarde na transactie" when available.</mat-hint>
+          </mat-form-field>
         } @else {
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Current balance</mat-label>
             <input matInput type="number" [(ngModel)]="form.currentBalance" name="currentBalance" required>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Opening balance offset</mat-label>
+            <input matInput type="number" [(ngModel)]="form.openingBalanceOffset" name="openingBalanceOffsetEdit" placeholder="Optional">
+            <mat-hint>Use when the ledger only has partial history (e.g. only last year). Displayed balance = offset + sum of bookings.</mat-hint>
           </mat-form-field>
         }
         <mat-form-field appearance="outline" class="full-width">
@@ -49,23 +61,14 @@ export interface AccountEditData {
             }
           </mat-select>
         </mat-form-field>
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Ledger account (Assets)</mat-label>
-          <mat-select [(ngModel)]="form.ledgerAccountId" name="ledgerAccountId" required>
-            @if (assetsLedgerAccounts.length === 0) {
-              <mat-option [value]="null" disabled>— No ledger accounts yet —</mat-option>
-            } @else {
-              @for (la of assetsLedgerAccounts; track la.id) {
-                <mat-option [value]="la.id">{{ la.code }} {{ la.name }}</mat-option>
-              }
-            }
-          </mat-select>
-          @if (assetsLedgerAccounts.length === 0) {
-            <mat-hint>Create at least one ledger account under Assets in Chart of accounts first.</mat-hint>
-          } @else {
-            <mat-hint>Required. Only accounts from the Assets category are shown.</mat-hint>
-          }
-        </mat-form-field>
+        <app-ledger-account-select
+          [accounts]="assetsLedgerAccounts"
+          [value]="form.ledgerAccountId"
+          (valueChange)="form.ledgerAccountId = $event"
+          label="Ledger account (Assets)"
+          placeholder="Type to filter..."
+          [required]="true"
+          [hint]="assetsLedgerAccounts.length === 0 ? 'Create at least one ledger account under Assets in Chart of accounts first.' : 'Required. Only accounts from the Assets category are shown.'" />
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -82,6 +85,7 @@ export interface AccountEditData {
 export class AccountEditDialogComponent implements OnInit {
   private readonly ref = inject(MatDialogRef<AccountEditDialogComponent>);
   private readonly ledgerService = inject(LedgerService);
+  private readonly transactionLinesService = inject(TransactionLinesService);
   readonly data = inject<AccountEditData>(MAT_DIALOG_DATA);
   readonly CURRENCIES = CURRENCIES;
 
@@ -97,6 +101,7 @@ export class AccountEditDialogComponent implements OnInit {
         accountNumber: this.data.item.accountNumber ?? '',
         name: this.data.item.name,
         currentBalance: this.data.item.currentBalance,
+        openingBalanceOffset: this.data.item.openingBalanceOffset ?? null as number | null,
         currency: this.data.item.currency,
         ledgerAccountId: this.data.item.ledgerAccountId ?? null,
       }
@@ -104,12 +109,18 @@ export class AccountEditDialogComponent implements OnInit {
         accountNumber: '',
         name: this.data.initialName ?? '',
         currentBalance: 0,
+        openingBalanceOffset: null as number | null,
         currency: 'EUR',
         ledgerAccountId: null as number | null,
       };
 
   ngOnInit(): void {
     this.ledgerService.getAssets().subscribe((list) => (this.assetsLedgerAccounts = list));
+    if (this.fromTransactions() && this.data.initialName) {
+      this.transactionLinesService.getSuggestedOpeningBalance(this.data.initialName).subscribe((v) => {
+        if (v !== null && this.form.openingBalanceOffset === null) this.form.openingBalanceOffset = v;
+      });
+    }
   }
 
   canSave(): boolean {
@@ -121,6 +132,7 @@ export class AccountEditDialogComponent implements OnInit {
       accountNumber: this.form.accountNumber?.trim() || null,
       name: this.form.name.trim(),
       currentBalance: this.fromTransactions() ? 0 : Number(this.form.currentBalance),
+      openingBalanceOffset: this.form.openingBalanceOffset ?? null,
       currency: this.form.currency,
       ledgerAccountId: this.form.ledgerAccountId ?? null,
     });

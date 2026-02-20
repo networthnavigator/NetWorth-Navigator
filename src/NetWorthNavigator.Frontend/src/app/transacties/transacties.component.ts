@@ -231,7 +231,9 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
                                         } @else {
                                           <span class="material-symbols-outlined review-icon pending">schedule</span>
                                           Requires review
-                                          <button mat-stroked-button (click)="markAsReviewed(row, data); $event.stopPropagation()" class="mark-reviewed-btn">
+                                          <button mat-stroked-button (click)="markAsReviewed(row, data); $event.stopPropagation()" class="mark-reviewed-btn"
+                                            [disabled]="!bookingInBalance(data.lines)"
+                                            [matTooltip]="!bookingInBalance(data.lines) ? 'Booking must be in balance (debits = credits) to mark as reviewed' : null">
                                             <span class="material-symbols-outlined">check_circle</span>
                                             Mark as reviewed
                                           </button>
@@ -405,7 +407,7 @@ export class TransactiesComponent implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   protected readonly getCurrencySymbol = getCurrencySymbol;
 
-  groups: TransactionsByAccount[] = [];
+  groups = signal<TransactionsByAccount[]>([]);
   loading = false;
   displayedColumns: string[] = ['expand', 'balance', 'review', 'date', 'contraAccountName', 'description', 'amount', 'details'];
   selectedTransaction: TransactionLine | null = null;
@@ -427,17 +429,17 @@ export class TransactiesComponent implements OnInit {
 
   distinctOwnAccounts = computed(() => {
     const set = new Set<string>();
-    this.groups.forEach(g => set.add(g.ownAccount));
+    this.groups().forEach(g => set.add(g.ownAccount));
     return Array.from(set).sort();
   });
   distinctContraNames = computed(() => {
     const set = new Set<string>();
-    this.groups.forEach(g => g.transactions.forEach(t => set.add(t.contraAccountName ?? '')));
+    this.groups().forEach(g => g.transactions.forEach(t => set.add(t.contraAccountName ?? '')));
     return Array.from(set).sort((a, b) => (a || '').localeCompare(b || ''));
   });
 
   filteredGroups = computed(() => {
-    let list = this.groups;
+    let list = this.groups();
     const q = this.searchQuery.trim().toLowerCase();
     const dateFrom = this.filterDateFrom ? new Date(this.filterDateFrom) : null;
     const dateTo = this.filterDateTo ? new Date(this.filterDateTo) : null;
@@ -539,12 +541,20 @@ export class TransactiesComponent implements OnInit {
     return state.reviewedAt ? 'verified' : 'schedule';
   }
 
-  /** True when total debits equal total credits (booking is in balance). */
+  /** True when total debits equal total credits per currency (booking is in balance). */
   bookingInBalance(lines: BookingLineDto[]): boolean {
     if (!lines?.length) return true;
-    const debits = lines.reduce((s, l) => s + Number(l.debitAmount), 0);
-    const credits = lines.reduce((s, l) => s + Number(l.creditAmount), 0);
-    return Math.abs(debits - credits) < 1e-6;
+    const byCurrency = new Map<string, { debit: number; credit: number }>();
+    for (const l of lines) {
+      const c = l.currency ?? 'EUR';
+      const cur = byCurrency.get(c) ?? { debit: 0, credit: 0 };
+      cur.debit += Number(l.debitAmount);
+      cur.credit += Number(l.creditAmount);
+      byCurrency.set(c, cur);
+    }
+    for (const { debit, credit } of byCurrency.values())
+      if (Math.abs(debit - credit) >= 1e-6) return false;
+    return true;
   }
 
   /** Refetch booking by source document line and update cache. */
@@ -586,6 +596,7 @@ export class TransactiesComponent implements OnInit {
           description: row.description ?? undefined,
           amount: row.amount,
           currency: row.currency,
+          documentLineId: row.id,
         },
       },
     });
@@ -640,7 +651,8 @@ export class TransactiesComponent implements OnInit {
       bookings: this.bookingsService.getAll().pipe(catchError(() => of([]))),
     }).subscribe({
       next: ({ lines, bookings }) => {
-        this.groups = this.groupByOwnAccount(lines);
+        this.groups.set(this.groupByOwnAccount(lines));
+        this.lineItemsCache.clear();
         for (const b of bookings) {
           if (b.sourceDocumentLineId) this.lineItemsCache.set(b.sourceDocumentLineId, b);
         }

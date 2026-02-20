@@ -11,5 +11,13 @@ export const routes: Routes = [
   { path: 'booking-rules/edit/:id', loadComponent: () => import('./booking-rules/booking-rule-form.component').then(m => m.BookingRuleFormComponent), canActivate: [authGuard] },
   { path: 'chart-of-accounts', loadComponent: () => import('./rekening-schema/rekening-schema.component').then(m => m.RekeningSchemaComponent), canActivate: [authGuard] },
   { path: 'assets-liabilities', loadComponent: () => import('./assets-liabilities/assets-liabilities.component').then(m => m.AssetsLiabilitiesComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/accounts/new', loadComponent: () => import('./assets-liabilities/add-account.component').then(m => m.AddAccountComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/accounts/edit/:id', loadComponent: () => import('./assets-liabilities/add-account.component').then(m => m.AddAccountComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/investment-accounts/new', loadComponent: () => import('./assets-liabilities/investment-account-form.component').then(m => m.InvestmentAccountFormComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/investment-accounts/edit/:id', loadComponent: () => import('./assets-liabilities/investment-account-form.component').then(m => m.InvestmentAccountFormComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/properties/new', loadComponent: () => import('./assets-liabilities/property-form.component').then(m => m.PropertyFormComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/properties/edit/:id', loadComponent: () => import('./assets-liabilities/property-form.component').then(m => m.PropertyFormComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/mortgages/new', loadComponent: () => import('./assets-liabilities/mortgage-form.component').then(m => m.MortgageFormComponent), canActivate: [authGuard] },
+  { path: 'assets-liabilities/mortgages/edit/:id', loadComponent: () => import('./assets-liabilities/mortgage-form.component').then(m => m.MortgageFormComponent), canActivate: [authGuard] },
   { path: '**', redirectTo: 'home' },
 ];

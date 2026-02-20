@@ -14,17 +14,15 @@ import { BalanceSheetAccount, InvestmentAccount, Property, PropertyValuation, Mo
 import { AssetsLiabilitiesService } from '../services/assets-liabilities.service';
 import { TransactionLinesService } from '../services/transaction-lines.service';
 import { getCurrencySymbol } from '../models/preferences.model';
-import { AccountEditDialogComponent, AccountEditData } from './account-edit-dialog.component';
-import { InvestmentAccountEditDialogComponent, InvestmentAccountEditData } from './investment-account-edit-dialog.component';
-import { PropertyEditDialogComponent, PropertyEditData } from './property-edit-dialog.component';
+import { RouterLink } from '@angular/router';
 import { ValuationFormDialogComponent, ValuationFormDialogData } from './valuation-form-dialog.component';
-import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-dialog.component';
 
 @Component({
   selector: 'app-assets-liabilities',
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -55,10 +53,10 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
       <mat-card>
         <mat-card-header>
           <mat-card-title>My accounts</mat-card-title>
-          <button mat-stroked-button (click)="addAccount()">
+          <a mat-stroked-button routerLink="/assets-liabilities/accounts/new">
             <span class="material-symbols-outlined">add</span>
             Add account
-          </button>
+          </a>
         </mat-card-header>
         <mat-card-content>
           @if (accountsWithoutLedger().length > 0) {
@@ -90,7 +88,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef></th>
               <td mat-cell *matCellDef="let row">
-                <button mat-icon-button (click)="editAccount(row)" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></button>
+                <a mat-icon-button [routerLink]="['/assets-liabilities/accounts/edit', row.id]" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></a>
                 <button mat-icon-button (click)="deleteAccount(row)" matTooltip="Delete"><span class="material-symbols-outlined">delete</span></button>
               </td>
               <td mat-footer-cell *matFooterCellDef></td>
@@ -111,10 +109,10 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
                 @for (ownAccount of ownAccountsToAdd(); track ownAccount) {
                   <li class="own-account-item">
                     <span class="own-account-name">{{ ownAccount }}</span>
-                    <button mat-stroked-button color="primary" (click)="addAccount(ownAccount)">
+                    <a mat-stroked-button color="primary" [routerLink]="['/assets-liabilities/accounts/new']" [queryParams]="{ initialName: ownAccount }">
                       <span class="material-symbols-outlined">add</span>
                       Add
-                    </button>
+                    </a>
                   </li>
                 }
               </ul>
@@ -128,10 +126,10 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
       <mat-card>
         <mat-card-header>
           <mat-card-title>Investment accounts</mat-card-title>
-          <button mat-stroked-button (click)="addInvestmentAccount()">
+          <a mat-stroked-button routerLink="/assets-liabilities/investment-accounts/new">
             <span class="material-symbols-outlined">add</span>
             Add investment account
-          </button>
+          </a>
         </mat-card-header>
         <mat-card-content>
           <table mat-table [dataSource]="investmentAccounts()" class="full-width">
@@ -139,6 +137,11 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
               <th mat-header-cell *matHeaderCellDef>Name</th>
               <td mat-cell *matCellDef="let row">{{ row.name }}</td>
               <td mat-footer-cell *matFooterCellDef class="total-row"><strong>Total</strong></td>
+            </ng-container>
+            <ng-container matColumnDef="ledger">
+              <th mat-header-cell *matHeaderCellDef>Ledger</th>
+              <td mat-cell *matCellDef="let row">{{ row.ledgerAccountName || '—' }}</td>
+              <td mat-footer-cell *matFooterCellDef class="total-row"></td>
             </ng-container>
             <ng-container matColumnDef="currentBalance">
               <th mat-header-cell *matHeaderCellDef>Current balance</th>
@@ -148,7 +151,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef></th>
               <td mat-cell *matCellDef="let row">
-                <button mat-icon-button (click)="editInvestmentAccount(row)" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></button>
+                <a mat-icon-button [routerLink]="['/assets-liabilities/investment-accounts/edit', row.id]" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></a>
                 <button mat-icon-button (click)="deleteInvestmentAccount(row)" matTooltip="Delete"><span class="material-symbols-outlined">delete</span></button>
               </td>
               <td mat-footer-cell *matFooterCellDef></td>
@@ -158,7 +161,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             @if (investmentAccounts().length > 2) {
               <tr mat-footer-row *matFooterRowDef="investmentAccountColumns"></tr>
             }
-            <tr class="mat-row" *matNoDataRow><td class="mat-cell" colspan="3">No investment accounts yet. Add one to get started.</td></tr>
+            <tr class="mat-row" *matNoDataRow><td class="mat-cell" colspan="4">No investment accounts yet. Add one to get started.</td></tr>
           </table>
         </mat-card-content>
       </mat-card>
@@ -168,10 +171,10 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
       <mat-card>
         <mat-card-header>
           <mat-card-title>My properties</mat-card-title>
-          <button mat-stroked-button (click)="addProperty()">
+          <a mat-stroked-button routerLink="/assets-liabilities/properties/new">
             <span class="material-symbols-outlined">add</span>
             Add property
-          </button>
+          </a>
         </mat-card-header>
         <mat-card-content>
           <table mat-table [dataSource]="properties()" class="full-width" multiTemplateDataRows>
@@ -207,7 +210,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef></th>
               <td mat-cell *matCellDef="let row">
-                <button mat-icon-button (click)="editProperty(row); $event.stopPropagation()" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></button>
+                <a mat-icon-button [routerLink]="['/assets-liabilities/properties/edit', row.id]" (click)="$event.stopPropagation()" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></a>
                 <button mat-icon-button (click)="deleteProperty(row); $event.stopPropagation()" matTooltip="Delete"><span class="material-symbols-outlined">delete</span></button>
               </td>
               <td mat-footer-cell *matFooterCellDef></td>
@@ -249,7 +252,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             </ng-container>
             <tr mat-header-row *matHeaderRowDef="propertyColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: propertyColumns" (click)="togglePropertyExpanded(row)" class="clickable-row"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['propertyExpandedDetail']" class="mortgage-detail-row"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['propertyExpandedDetail']" class="expandable-detail-row" [class.expandable-detail-row--open]="isPropertyExpanded(row)"></tr>
             @if (properties().length > 2) {
               <tr mat-footer-row *matFooterRowDef="propertyColumns"></tr>
             }
@@ -263,10 +266,10 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
       <mat-card>
         <mat-card-header>
           <mat-card-title>My mortgages</mat-card-title>
-          <button mat-stroked-button (click)="addMortgage()">
+          <a mat-stroked-button routerLink="/assets-liabilities/mortgages/new">
             <span class="material-symbols-outlined">add</span>
             Add mortgage
-          </button>
+          </a>
         </mat-card-header>
         <mat-card-content>
           <table mat-table [dataSource]="mortgages()" class="full-width" multiTemplateDataRows>
@@ -302,7 +305,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef></th>
               <td mat-cell *matCellDef="let row">
-                <button mat-icon-button (click)="editMortgage(row); $event.stopPropagation()" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></button>
+                <a mat-icon-button [routerLink]="['/assets-liabilities/mortgages/edit', row.id]" (click)="$event.stopPropagation()" matTooltip="Edit"><span class="material-symbols-outlined">edit</span></a>
                 <button mat-icon-button (click)="deleteMortgage(row); $event.stopPropagation()" matTooltip="Delete"><span class="material-symbols-outlined">delete</span></button>
               </td>
               <td mat-footer-cell *matFooterCellDef></td>
@@ -324,7 +327,7 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
             </ng-container>
             <tr mat-header-row *matHeaderRowDef="mortgageColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: mortgageColumns" (click)="toggleMortgageExpanded(row)" class="clickable-row"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['mortgageExpandedDetail']" class="mortgage-detail-row"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['mortgageExpandedDetail']" class="expandable-detail-row" [class.expandable-detail-row--open]="isMortgageExpanded(row)"></tr>
             @if (mortgages().length > 2) {
               <tr mat-footer-row *matFooterRowDef="mortgageColumns"></tr>
             }
@@ -345,6 +348,11 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
     .section mat-card-header button .material-symbols-outlined { font-size: 20px; vertical-align: middle; margin-right: 4px; }
     .header-actions button .material-symbols-outlined { font-size: 20px; vertical-align: middle; margin-right: 4px; }
     .full-width { width: 100%; }
+    .full-width .mat-mdc-header-row,
+    .full-width .mat-mdc-row,
+    .full-width tr.mat-mdc-footer-row { min-height: 40px; }
+    .full-width .mat-mdc-header-cell,
+    .full-width .mat-mdc-cell { padding-top: 4px; padding-bottom: 4px; box-sizing: border-box; }
     .full-width .mono { font-family: ui-monospace, monospace; font-size: 0.9rem; }
     .total-row { font-weight: 500; border-top: 1px solid rgba(0,0,0,0.12); }
     html.theme-dark .total-row { border-top-color: rgba(255,255,255,0.12); }
@@ -355,7 +363,10 @@ import { MortgageEditDialogComponent, MortgageEditData } from './mortgage-edit-d
     .expand-col { width: 48px; }
     .expanded-cell { padding: 0; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,0.12); }
     html.theme-dark .expanded-cell { border-bottom-color: rgba(255,255,255,0.12); }
-    .mortgage-detail-row .mat-mdc-cell { border-bottom-width: 0; }
+    /* Collapsed expandable row: no height so it doesn't add empty space */
+    .expandable-detail-row:not(.expandable-detail-row--open) { min-height: 0; height: 0; }
+    .expandable-detail-row:not(.expandable-detail-row--open) .mat-mdc-cell { padding: 0; min-height: 0; height: 0; overflow: hidden; border-bottom-width: 0; }
+    .expandable-detail-row.expandable-detail-row--open .mat-mdc-cell { border-bottom-width: 0; }
     .expanded-detail { padding: 12px 16px; background: rgba(0,0,0,0.02); }
     html.theme-dark .expanded-detail { background: rgba(255,255,255,0.04); }
     .detail-dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; font-size: 0.9rem; }
@@ -407,10 +418,19 @@ export class AssetsLiabilitiesComponent implements OnInit {
   readonly accountsTotal = computed(() =>
     this.accounts().reduce((sum, a) => sum + a.currentBalance, 0)
   );
-  /** Own accounts from transactions that are not yet in My Accounts (by name). */
+  /** Own accounts from transactions that are not yet in My Accounts (match by name or account number). */
   readonly ownAccountsToAdd = computed(() => {
-    const existingNames = new Set(this.accounts().map(a => a.name));
-    return this.ownAccountsFromTransactions().filter(name => !existingNames.has(name));
+    const known = new Set<string>();
+    this.accounts().forEach(a => {
+      const n = (a.name ?? '').trim();
+      if (n) known.add(n.toLowerCase());
+      const num = (a.accountNumber ?? '').trim();
+      if (num) known.add(num.toLowerCase());
+    });
+    return this.ownAccountsFromTransactions().filter(own => {
+      const t = (own ?? '').trim();
+      return t && !known.has(t.toLowerCase());
+    });
   });
   readonly investmentAccountsTotal = computed(() =>
     this.investmentAccounts().reduce((sum, a) => sum + a.currentBalance, 0)
@@ -428,7 +448,7 @@ export class AssetsLiabilitiesComponent implements OnInit {
   readonly accountsWithoutLedger = computed(() =>
     this.accounts().filter(a => !a.ledgerAccountId || !a.ledgerAccountName)
   );
-  investmentAccountColumns = ['name', 'currentBalance', 'actions'];
+  investmentAccountColumns = ['name', 'ledger', 'currentBalance', 'actions'];
   propertyColumns = ['expand', 'name', 'purchaseDate', 'purchaseValue', 'estimatedValue', 'actions'];
   valuationColumns = ['date', 'value', 'actions'];
   mortgageColumns = ['expand', 'name', 'interestStartDate', 'startValue', 'currentValue', 'actions'];
@@ -672,80 +692,21 @@ export class AssetsLiabilitiesComponent implements OnInit {
     });
   }
 
-  addAccount(initialName?: string): void {
-    const data: AccountEditData = initialName ? { initialName } : {};
-    const ref = this.dialog.open(AccountEditDialogComponent, { data, width: '400px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.createAccount(result).subscribe(() => this.load());
-    });
-  }
-  editAccount(row: BalanceSheetAccount): void {
-    const ref = this.dialog.open(AccountEditDialogComponent, { data: { item: row } as AccountEditData, width: '400px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.updateAccount({ ...row, ...result }).subscribe(() => this.load());
-    });
-  }
   deleteAccount(row: BalanceSheetAccount): void {
     if (!confirm('Delete account "' + row.name + '"?')) return;
     this.service.deleteAccount(row.id).subscribe(() => this.load());
   }
 
-  addInvestmentAccount(): void {
-    const ref = this.dialog.open(InvestmentAccountEditDialogComponent, { data: {} as InvestmentAccountEditData, width: '400px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.createInvestmentAccount(result).subscribe(() => this.load());
-    });
-  }
-  editInvestmentAccount(row: InvestmentAccount): void {
-    const ref = this.dialog.open(InvestmentAccountEditDialogComponent, { data: { item: row } as InvestmentAccountEditData, width: '400px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.updateInvestmentAccount({ ...row, ...result }).subscribe(() => this.load());
-    });
-  }
   deleteInvestmentAccount(row: InvestmentAccount): void {
     if (!confirm('Delete investment account "' + row.name + '"?')) return;
     this.service.deleteInvestmentAccount(row.id).subscribe(() => this.load());
   }
 
-  addProperty(): void {
-    const ref = this.dialog.open(PropertyEditDialogComponent, { data: {} as PropertyEditData, width: '400px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.createProperty(result).subscribe(() => this.load());
-    });
-  }
-  editProperty(row: Property): void {
-    const ref = this.dialog.open(PropertyEditDialogComponent, { data: { item: row } as PropertyEditData, width: '400px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) {
-        const payload: Property = {
-          id: row.id,
-          name: result.name,
-          purchaseValue: result.purchaseValue ?? null,
-          purchaseDate: result.purchaseDate ?? null,
-          currency: result.currency,
-          sortOrder: row.sortOrder,
-        };
-        this.service.updateProperty(payload).subscribe(() => this.load());
-      }
-    });
-  }
   deleteProperty(row: Property): void {
     if (!confirm('Delete property "' + row.name + '"?')) return;
     this.service.deleteProperty(row.id).subscribe(() => this.load());
   }
 
-  addMortgage(): void {
-    const ref = this.dialog.open(MortgageEditDialogComponent, { data: {} as MortgageEditData, width: '420px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.createMortgage(result).subscribe(() => this.load());
-    });
-  }
-  editMortgage(row: Mortgage): void {
-    const ref = this.dialog.open(MortgageEditDialogComponent, { data: { item: row } as MortgageEditData, width: '420px' });
-    ref.afterClosed().subscribe((result) => {
-      if (result) this.service.updateMortgage({ ...row, ...result }).subscribe(() => this.load());
-    });
-  }
   deleteMortgage(row: Mortgage): void {
     if (!confirm('Delete mortgage "' + row.name + '"?')) return;
     this.service.deleteMortgage(row.id).subscribe(() => this.load());

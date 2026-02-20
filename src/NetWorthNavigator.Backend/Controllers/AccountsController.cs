@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using NetWorthNavigator.Backend.Application.DTOs;
 using NetWorthNavigator.Backend.Application.Services;
+using NetWorthNavigator.Backend.Services;
 
 namespace NetWorthNavigator.Backend.Controllers;
 
@@ -9,8 +10,13 @@ namespace NetWorthNavigator.Backend.Controllers;
 public class AccountsController : ControllerBase
 {
     private readonly IAccountsApplicationService _service;
+    private readonly OwnAccountRuleSyncService _ownAccountRuleSync;
 
-    public AccountsController(IAccountsApplicationService service) => _service = service;
+    public AccountsController(IAccountsApplicationService service, OwnAccountRuleSyncService ownAccountRuleSync)
+    {
+        _service = service;
+        _ownAccountRuleSync = ownAccountRuleSync;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BalanceSheetAccountDto>>> GetAll(CancellationToken ct)
@@ -25,6 +31,7 @@ public class AccountsController : ControllerBase
         try
         {
             var result = await _service.CreateAsync(dto, ct);
+            await _ownAccountRuleSync.EnsureRuleForBalanceSheetAccountAsync(result.Id, ct);
             return CreatedAtAction(nameof(GetAll), new { id = result.Id }, result);
         }
         catch (ArgumentException ex)
@@ -40,6 +47,7 @@ public class AccountsController : ControllerBase
         {
             var result = await _service.UpdateAsync(id, dto, ct);
             if (result == null) return NotFound();
+            await _ownAccountRuleSync.EnsureRuleForBalanceSheetAccountAsync(id, ct);
             return Ok(result);
         }
         catch (ArgumentException ex)

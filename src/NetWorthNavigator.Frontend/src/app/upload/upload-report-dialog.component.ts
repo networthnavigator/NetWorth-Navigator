@@ -85,7 +85,7 @@ export interface UploadReportDialogData {
             <th mat-header-cell *matHeaderCellDef>Action</th>
             <td mat-cell *matCellDef="let row">
               <span class="action-badge" [class.import]="row.action === 'import'" [class.skip]="row.action === 'skip'">
-                {{ row.action === 'import' ? 'Import' : 'Skip' }}
+                {{ row.action === 'import' ? 'Import' : 'Skip' }}{{ row.action === 'skip' && row.actionReason ? ' — ' + row.actionReason : '' }}
               </span>
             </td>
           </ng-container>

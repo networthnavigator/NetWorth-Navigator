@@ -8,6 +8,8 @@ public class BalanceSheetAccount
     public string? AccountNumber { get; set; }
     public string Name { get; set; } = string.Empty;
     public decimal CurrentBalance { get; set; }
+    /// <summary>Opening balance offset when ledger only has partial history. Displayed balance = OpeningBalanceOffset + ledger balance from bookings.</summary>
+    public decimal? OpeningBalanceOffset { get; set; }
     public string Currency { get; set; } = "EUR";
     public int SortOrder { get; set; }
     public int? LedgerAccountId { get; set; }

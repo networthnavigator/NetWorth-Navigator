@@ -34,13 +34,16 @@ public class TransactionLinesController : ControllerBase
         return Ok(dtos);
     }
 
-    /// <summary>DELETE - Deletes all transaction documents and their lines.</summary>
+    /// <summary>DELETE - Deletes all transaction documents and their lines. Also deletes bookings that reference them (FK).</summary>
     [HttpDelete]
     public async Task<ActionResult> DeleteAll()
     {
+        // Order matters: BookingLines -> Bookings (reference TransactionDocumentLines) -> TransactionDocumentLines -> TransactionDocuments
+        var bookingLinesDeleted = await _context.BookingLines.ExecuteDeleteAsync();
+        var bookingsDeleted = await _context.Bookings.ExecuteDeleteAsync();
         var lineCount = await _context.TransactionDocumentLines.ExecuteDeleteAsync();
         var docCount = await _context.TransactionDocuments.ExecuteDeleteAsync();
-        return Ok(new { deleted = lineCount, deletedLines = lineCount, deletedDocuments = docCount });
+        return Ok(new { deleted = lineCount, deletedLines = lineCount, deletedDocuments = docCount, deletedBookings = bookingsDeleted, deletedBookingLines = bookingLinesDeleted });
     }
 
     /// <summary>GET own-accounts - Distinct OwnAccount values from document lines (for balance sheet accounts).</summary>
@@ -54,6 +57,23 @@ public class TransactionLinesController : ControllerBase
             .OrderBy(s => s)
             .ToListAsync();
         return Ok(accounts);
+    }
+
+    /// <summary>GET suggested opening balance for an own-account: balance before the earliest imported transaction (BalanceAfter - Amount of earliest line). Used to pre-fill Opening balance offset when adding an account from transactions.</summary>
+    [HttpGet("suggested-opening-balance")]
+    public async Task<ActionResult<decimal?>> GetSuggestedOpeningBalance([FromQuery] string? ownAccount)
+    {
+        if (string.IsNullOrWhiteSpace(ownAccount)) return BadRequest();
+        var key = ownAccount.Trim();
+        var earliest = await _context.TransactionDocumentLines
+            .Where(l => l.OwnAccount == key)
+            .OrderBy(l => l.Date)
+            .ThenBy(l => l.LineNumber)
+            .FirstOrDefaultAsync();
+        if (earliest == null) return Ok((decimal?)null);
+        // Balance before this transaction = BalanceAfter - Amount
+        var suggested = (earliest.BalanceAfter ?? 0) - earliest.Amount;
+        return Ok(suggested);
     }
 
     private static TransactionLineDto ToDto(TransactionDocumentLine l)

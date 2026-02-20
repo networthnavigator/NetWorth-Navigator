@@ -20,6 +20,7 @@ export class AssetsLiabilitiesService {
       accountNumber: item.accountNumber ?? null,
       name: item.name,
       currentBalance: item.currentBalance ?? 0,
+      openingBalanceOffset: item.openingBalanceOffset ?? null,
       currency: item.currency ?? 'EUR',
       ledgerAccountId: item.ledgerAccountId ?? null,
     };
@@ -30,6 +31,7 @@ export class AssetsLiabilitiesService {
       accountNumber: item.accountNumber ?? null,
       name: item.name,
       currentBalance: item.currentBalance,
+      openingBalanceOffset: item.openingBalanceOffset ?? null,
       currency: item.currency,
       ledgerAccountId: item.ledgerAccountId ?? null,
     };
@@ -43,10 +45,20 @@ export class AssetsLiabilitiesService {
     return this.http.get<InvestmentAccount[]>(`${BASE}/investment-accounts`);
   }
   createInvestmentAccount(item: Partial<InvestmentAccount>): Observable<InvestmentAccount> {
-    return this.http.post<InvestmentAccount>(`${BASE}/investment-accounts`, item);
+    return this.http.post<InvestmentAccount>(`${BASE}/investment-accounts`, {
+      name: item.name,
+      currentBalance: item.currentBalance ?? 0,
+      currency: item.currency ?? 'EUR',
+      ledgerAccountId: item.ledgerAccountId ?? null,
+    });
   }
   updateInvestmentAccount(item: InvestmentAccount): Observable<InvestmentAccount> {
-    return this.http.put<InvestmentAccount>(`${BASE}/investment-accounts/${item.id}`, item);
+    return this.http.put<InvestmentAccount>(`${BASE}/investment-accounts/${item.id}`, {
+      name: item.name,
+      currentBalance: item.currentBalance,
+      currency: item.currency,
+      ledgerAccountId: item.ledgerAccountId ?? null,
+    });
   }
   deleteInvestmentAccount(id: number): Observable<void> {
     return this.http.delete<void>(`${BASE}/investment-accounts/${id}`);

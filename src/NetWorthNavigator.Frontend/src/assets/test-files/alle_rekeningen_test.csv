@@ -6,6 +6,18 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250102;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;42,18;Betaalautomaat;Pasvolgnr: 002 02-01-2025 18:22 Valutadatum: 02-01-2025;1162,55;
 20250105;ING Hypotheken;NL00VAST0002000002;NL46INGB0005533333;IC;Af;1195,00;Incasso;Hypotheek januari 2025 IBAN: NL46INGB0005533333 Valutadatum: 05-01-2025;4500,00;
 20250106;Eneco;NL00VAST0002000002;NL12INGB0001234567;IC;Af;156,30;Incasso;Energienota dec 2024 IBAN: NL12INGB0001234567 Valutadatum: 06-01-2025;4303,70;
+20250107;Overboeking naar spaarrekening;NL00VERB0001000001;NL00VAST0002000002;OV;Af;500,00;Overschrijving;Overboeking naar spaarrekening;3780,22;
+20250107;Overboeking van betaalrekening;NL00VAST0002000002;NL00VERB0001000001;OV;Bij;500,00;Overschrijving;Overboeking van betaalrekening;5000,00;
+20250109;Overboeking naar spaarrekening;NL00VERB0001000001;NL00VAST0002000002;OV;Af;250,00;Overschrijving;Overboeking naar spaarrekening;3530,22;
+20250109;Overboeking van betaalrekening;NL00VAST0002000002;NL00VERB0001000001;OV;Bij;250,00;Overschrijving;Overboeking van betaalrekening;5250,00;
+20250111;Overboeking naar spaarrekening;NL00VERB0001000001;NL00VAST0002000002;OV;Af;1000,00;Overschrijving;Overboeking naar spaarrekening;2530,22;
+20250111;Overboeking van betaalrekening;NL00VAST0002000002;NL00VERB0001000001;OV;Bij;1000,00;Overschrijving;Overboeking van betaalrekening;6250,00;
+20250113;Overboeking naar spaarrekening;NL00VERB0001000001;NL00VAST0002000002;OV;Af;750,00;Overschrijving;Overboeking naar spaarrekening;1780,22;
+20250113;Overboeking van betaalrekening;NL00VAST0002000002;NL00VERB0001000001;OV;Bij;750,00;Overschrijving;Overboeking van betaalrekening;7000,00;
+20250114;Overboeking naar spaarrekening;NL00VERB0001000001;NL00VAST0002000002;OV;Af;300,00;Overschrijving;Overboeking naar spaarrekening;1480,22;
+20250114;Overboeking van betaalrekening;NL00VAST0002000002;NL00VERB0001000001;OV;Bij;300,00;Overschrijving;Overboeking van betaalrekening;7300,00;
+20250116;Overboeking naar spaarrekening;NL00VERB0001000001;NL00VAST0002000002;OV;Af;400,00;Overschrijving;Overboeking naar spaarrekening;1080,22;
+20250116;Overboeking van betaalrekening;NL00VAST0002000002;NL00VERB0001000001;OV;Bij;400,00;Overschrijving;Overboeking van betaalrekening;7700,00;
 20250108;Ziggo;NL00VAST0002000002;NL98INGB0000845745;IC;Af;52,50;Incasso;Internet + TV januari IBAN: NL98INGB0000845745 Valutadatum: 08-01-2025;4151,20;
 20250110;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;112,33;Betaalautomaat;Pasvolgnr: 003 10-01-2025 09:45 Valutadatum: 10-01-2025;1050,22;
 20250110;Tankstation Shell AMSTERDAM;NL00VERB0001000001;;BA;Af;68,50;Betaalautomaat;Pasvolgnr: 004 10-01-2025 14:00 Valutadatum: 10-01-2025;937,89;
@@ -15,6 +27,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250118;Restaurant De Waag LEIDEN;NL00VERB0001000001;;BA;Af;78,50;Betaalautomaat;Pasvolgnr: 006 18-01-2025 20:15 Valutadatum: 18-01-2025;802,49;
 20250120;H&M Amsterdam;NL00VERB0001000001;;BA;Af;89,95;Betaalautomaat;Pasvolgnr: 007 20-01-2025 16:00 Valutadatum: 20-01-2025;723,54;
 20250122;Plus Supermarkt KATWIJK;NL00VERB0001000001;;BA;Af;38,67;Betaalautomaat;Pasvolgnr: 008 22-01-2025 12:00 Valutadatum: 22-01-2025;684,87;
+20250124;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris januari 2025;3184,87;
+20250124;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris januari 2025;5984,87;
 20250125;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis jan IBAN: NL57INGB0006296331 Valutadatum: 25-01-2025;4025,82;
 20250128;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;95,20;Betaalautomaat;Pasvolgnr: 009 28-01-2025 10:00 Valutadatum: 28-01-2025;589,67;
 20250201;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;44,88;Betaalautomaat;Pasvolgnr: 010 01-02-2025 17:30 Valutadatum: 01-02-2025;544,79;
@@ -32,6 +46,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250218;Café Van der Werff LEIDEN;NL00VERB0001000001;;BA;Af;24,50;Betaalautomaat;Pasvolgnr: 014 18-02-2025 21:00 Valutadatum: 18-02-2025;254,62;
 20250220;Action LEIDEN NLD;NL00VERB0001000001;;BA;Af;31,45;Betaalautomaat;Pasvolgnr: 015 20-02-2025 14:00 Valutadatum: 20-02-2025;223,17;
 20250222;Dirk van den Broek KATWIJK;NL00VERB0001000001;;BA;Af;67,89;Betaalautomaat;Pasvolgnr: 016 22-02-2025 11:00 Valutadatum: 22-02-2025;191,72;
+20250224;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris februari 2025;2691,72;
+20250224;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris februari 2025;5491,72;
 20250225;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis feb IBAN: NL57INGB0006296331 Valutadatum: 25-02-2025;2368,84;
 20250228;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;88,40;Betaalautomaat;Pasvolgnr: 017 28-02-2025 10:30 Valutadatum: 28-02-2025;123,32;
 20250301;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;51,20;Betaalautomaat;Pasvolgnr: 018 01-03-2025 16:00 Valutadatum: 01-03-2025;72,12;
@@ -49,6 +65,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250318;Kruidvat 123 LEIDEN NLD;NL00VERB0001000001;;BA;Af;18,95;Betaalautomaat;Pasvolgnr: 022 18-03-2025 13:00 Valutadatum: 18-03-2025;-121,36;
 20250320;H&M Amsterdam;NL00VERB0001000001;;BA;Af;64,99;Betaalautomaat;Pasvolgnr: 023 20-03-2025 15:30 Valutadatum: 20-03-2025;-186,35;
 20250322;Plus Supermarkt KATWIJK;NL00VERB0001000001;;BA;Af;41,20;Betaalautomaat;Pasvolgnr: 024 22-03-2025 12:15 Valutadatum: 22-03-2025;-227,55;
+20250324;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris maart 2025;2272,45;
+20250324;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris maart 2025;5072,45;
 20250325;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis mrt IBAN: NL57INGB0006296331 Valutadatum: 25-03-2025;718,56;
 20250328;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;91,10;Betaalautomaat;Pasvolgnr: 025 28-03-2025 10:00 Valutadatum: 28-03-2025;-318,65;
 20250401;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;47,88;Betaalautomaat;Pasvolgnr: 026 01-04-2025 17:00 Valutadatum: 01-04-2025;-366,53;
@@ -65,6 +83,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250418;Restaurant Prentenkabinet LEIDEN;NL00VERB0001000001;;BA;Af;62,80;Betaalautomaat;Pasvolgnr: 029 18-04-2025 19:45 Valutadatum: 18-04-2025;-547,43;
 20250420;Jumbo Supermarkt LEIDEN;NL00VERB0001000001;;BA;Af;54,60;Betaalautomaat;Pasvolgnr: 030 20-04-2025 11:00 Valutadatum: 20-04-2025;-602,03;
 20250422;Dirk van den Broek KATWIJK;NL00VERB0001000001;;BA;Af;73,15;Betaalautomaat;Pasvolgnr: 031 22-04-2025 12:30 Valutadatum: 22-04-2025;-675,18;
+20250424;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris april 2025;1824,82;
+20250424;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris april 2025;4624,82;
 20250425;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis apr IBAN: NL57INGB0006296331 Valutadatum: 25-04-2025;-1976,64;
 20250428;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;85,90;Betaalautomaat;Pasvolgnr: 032 28-04-2025 10:15 Valutadatum: 28-04-2025;-761,08;
 20250501;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;49,25;Betaalautomaat;Pasvolgnr: 033 01-05-2025 16:30 Valutadatum: 01-05-2025;-810,33;
@@ -81,6 +101,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250518;Plus Supermarkt KATWIJK;NL00VERB0001000001;;BA;Af;52,30;Betaalautomaat;Pasvolgnr: 036 18-05-2025 13:00 Valutadatum: 18-05-2025;-1037,93;
 20250520;Café de Keyzer LEIDEN;NL00VERB0001000001;;BA;Af;19,80;Betaalautomaat;Pasvolgnr: 037 20-05-2025 20:30 Valutadatum: 20-05-2025;-1057,73;
 20250522;Action LEIDEN NLD;NL00VERB0001000001;;BA;Af;28,45;Betaalautomaat;Pasvolgnr: 038 22-05-2025 14:15 Valutadatum: 22-05-2025;-1086,18;
+20250524;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris mei 2025;1413,82;
+20250524;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris mei 2025;4213,82;
 20250525;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis mei IBAN: NL57INGB0006296331 Valutadatum: 25-05-2025;-4634,76;
 20250528;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;92,15;Betaalautomaat;Pasvolgnr: 039 28-05-2025 10:45 Valutadatum: 28-05-2025;-1178,33;
 20250601;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;55,60;Betaalautomaat;Pasvolgnr: 040 01-06-2025 17:15 Valutadatum: 01-06-2025;-1233,93;
@@ -97,6 +119,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250618;Tankstation Esso HAARLEM;NL00VERB0001000001;;BA;Af;71,20;Betaalautomaat;Pasvolgnr: 043 18-06-2025 07:30 Valutadatum: 18-06-2025;-1448,38;
 20250620;H&M Amsterdam;NL00VERB0001000001;;BA;Af;45,99;Betaalautomaat;Pasvolgnr: 044 20-06-2025 16:00 Valutadatum: 20-06-2025;-1494,37;
 20250622;Dirk van den Broek KATWIJK;NL00VERB0001000001;;BA;Af;69,30;Betaalautomaat;Pasvolgnr: 045 22-06-2025 11:45 Valutadatum: 22-06-2025;-1563,67;
+20250624;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris juni 2025;936,33;
+20250624;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris juni 2025;3736,33;
 20250625;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis jun IBAN: NL57INGB0006296331 Valutadatum: 25-06-2025;-7220,36;
 20250628;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;87,50;Betaalautomaat;Pasvolgnr: 046 28-06-2025 10:00 Valutadatum: 28-06-2025;-1651,17;
 20250701;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;48,90;Betaalautomaat;Pasvolgnr: 047 01-07-2025 16:45 Valutadatum: 01-07-2025;-1700,07;
@@ -113,6 +137,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250718;Restaurant De Burcht LEIDEN;NL00VERB0001000001;;BA;Af;85,60;Betaalautomaat;Pasvolgnr: 050 18-07-2025 20:00 Valutadatum: 18-07-2025;-1931,47;
 20250720;Tankstation Shell AMSTERDAM;NL00VERB0001000001;;BA;Af;66,80;Betaalautomaat;Pasvolgnr: 051 20-07-2025 15:00 Valutadatum: 20-07-2025;-1998,27;
 20250722;Jumbo Supermarkt LEIDEN;NL00VERB0001000001;;BA;Af;58,75;Betaalautomaat;Pasvolgnr: 052 22-07-2025 19:15 Valutadatum: 22-07-2025;-2057,02;
+20250724;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris juli 2025;442,98;
+20250724;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris juli 2025;3242,98;
 20250725;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis jul IBAN: NL57INGB0006296331 Valutadatum: 25-07-2025;-9723,00;
 20250728;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;94,20;Betaalautomaat;Pasvolgnr: 053 28-07-2025 10:30 Valutadatum: 28-07-2025;-2151,22;
 20250801;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;53,40;Betaalautomaat;Pasvolgnr: 054 01-08-2025 17:00 Valutadatum: 01-08-2025;-2204,62;
@@ -128,6 +154,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250818;Café L’Esperance LEIDEN;NL00VERB0001000001;;BA;Af;22,40;Betaalautomaat;Pasvolgnr: 056 18-08-2025 21:00 Valutadatum: 18-08-2025;-2309,92;
 20250820;Action LEIDEN NLD;NL00VERB0001000001;;BA;Af;35,80;Betaalautomaat;Pasvolgnr: 057 20-08-2025 14:30 Valutadatum: 20-08-2025;-2345,72;
 20250822;Dirk van den Broek KATWIJK;NL00VERB0001000001;;BA;Af;71,25;Betaalautomaat;Pasvolgnr: 058 22-08-2025 11:00 Valutadatum: 22-08-2025;-2416,97;
+20250824;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris augustus 2025;83,03;
+20250824;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris augustus 2025;2883,03;
 20250825;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis aug IBAN: NL57INGB0006296331 Valutadatum: 25-08-2025;-12175,15;
 20250828;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;89,60;Betaalautomaat;Pasvolgnr: 059 28-08-2025 10:00 Valutadatum: 28-08-2025;-2506,57;
 20250901;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;50,15;Betaalautomaat;Pasvolgnr: 060 01-09-2025 16:00 Valutadatum: 01-09-2025;-2556,72;
@@ -144,6 +172,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20250918;Tankstation BP UTRECHT;NL00VERB0001000001;;BA;Af;69,50;Betaalautomaat;Pasvolgnr: 063 18-09-2025 08:15 Valutadatum: 18-09-2025;-2783,37;
 20250920;H&M Amsterdam;NL00VERB0001000001;;BA;Af;72,45;Betaalautomaat;Pasvolgnr: 064 20-09-2025 15:45 Valutadatum: 20-09-2025;-2855,82;
 20250922;Plus Supermarkt KATWIJK;NL00VERB0001000001;;BA;Af;46,90;Betaalautomaat;Pasvolgnr: 065 22-09-2025 12:30 Valutadatum: 22-09-2025;-2902,72;
+20250924;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris september 2025;-402,72;
+20250924;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris september 2025;2397,28;
 20250925;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis sep IBAN: NL57INGB0006296331 Valutadatum: 25-09-2025;-14678,65;
 20250928;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;86,75;Betaalautomaat;Pasvolgnr: 066 28-09-2025 10:15 Valutadatum: 28-09-2025;-2989,47;
 20251001;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;54,20;Betaalautomaat;Pasvolgnr: 067 01-10-2025 17:15 Valutadatum: 01-10-2025;-3043,67;
@@ -160,6 +190,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20251018;Restaurant Waag LEIDEN;NL00VERB0001000001;;BA;Af;71,20;Betaalautomaat;Pasvolgnr: 070 18-10-2025 19:30 Valutadatum: 18-10-2025;-3281,72;
 20251020;Tankstation Esso HAARLEM;NL00VERB0001000001;;BA;Af;64,90;Betaalautomaat;Pasvolgnr: 071 20-10-2025 07:45 Valutadatum: 20-10-2025;-3346,62;
 20251022;Jumbo Supermarkt LEIDEN;NL00VERB0001000001;;BA;Af;57,80;Betaalautomaat;Pasvolgnr: 072 22-10-2025 19:00 Valutadatum: 22-10-2025;-3404,42;
+20251024;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris oktober 2025;-904,42;
+20251024;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris oktober 2025;1895,58;
 20251025;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis okt IBAN: NL57INGB0006296331 Valutadatum: 25-10-2025;-17200,56;
 20251028;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;91,40;Betaalautomaat;Pasvolgnr: 073 28-10-2025 10:30 Valutadatum: 28-10-2025;-3495,82;
 20251101;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;58,65;Betaalautomaat;Pasvolgnr: 074 01-11-2025 16:30 Valutadatum: 01-11-2025;-3554,47;
@@ -176,6 +208,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20251118;Kruidvat 123 LEIDEN NLD;NL00VERB0001000001;;BA;Af;21,95;Betaalautomaat;Pasvolgnr: 077 18-11-2025 13:30 Valutadatum: 18-11-2025;-3746,57;
 20251120;Café de Vergulde Turk LEIDEN;NL00VERB0001000001;;BA;Af;26,80;Betaalautomaat;Pasvolgnr: 078 20-11-2025 21:00 Valutadatum: 20-11-2025;-3773,37;
 20251122;Action LEIDEN NLD;NL00VERB0001000001;;BA;Af;42,30;Betaalautomaat;Pasvolgnr: 079 22-11-2025 14:00 Valutadatum: 22-11-2025;-3815,67;
+20251124;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris november 2025;-1315,67;
+20251124;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris november 2025;1484,33;
 20251125;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis nov IBAN: NL57INGB0006296331 Valutadatum: 25-11-2025;-19712,56;
 20251128;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;96,55;Betaalautomaat;Pasvolgnr: 080 28-11-2025 10:00 Valutadatum: 28-11-2025;-3912,22;
 20251201;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;67,80;Betaalautomaat;Pasvolgnr: 081 01-12-2025 17:00 Valutadatum: 01-12-2025;-3980,02;
@@ -192,6 +226,8 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 20251218;Dirk van den Broek KATWIJK;NL00VERB0001000001;;BA;Af;78,90;Betaalautomaat;Pasvolgnr: 084 18-12-2025 12:00 Valutadatum: 18-12-2025;-4275,97;
 20251220;Restaurant Het Prentenkabinet;NL00VERB0001000001;;BA;Af;95,50;Betaalautomaat;Pasvolgnr: 085 20-12-2025 20:00 Valutadatum: 20-12-2025;-4371,47;
 20251222;Tankstation Shell AMSTERDAM;NL00VERB0001000001;;BA;Af;70,25;Betaalautomaat;Pasvolgnr: 086 22-12-2025 14:30 Valutadatum: 22-12-2025;-4441,72;
+20251224;Salaris Nelleke;NL00VERB0001000001;NL10Werkgever0000001;IC;Bij;2500,00;Overschrijving;Salaris december 2025;-1941,72;
+20251224;Salaris Ewout;NL00VERB0001000001;NL10Werkgever0000002;IC;Bij;2800,00;Overschrijving;Salaris december 2025;858,28;
 20251225;Nationale-Nederlanden;NL00VAST0002000002;NL57INGB0006296331;IC;Af;28,45;Incasso;Verzekering woonhuis dec IBAN: NL57INGB0006296331 Valutadatum: 25-12-2025;-22209,66;
 20251228;Albert Heijn 1234 AMSTERDAM NLD;NL00VERB0001000001;;BA;Af;134,20;Betaalautomaat;Pasvolgnr: 087 28-12-2025 10:00 Valutadatum: 28-12-2025;-4575,92;
 20251231;Lidl 456 LEIDEN NLD;NL00VERB0001000001;;BA;Af;72,15;Betaalautomaat;Pasvolgnr: 088 31-12-2025 16:00 Valutadatum: 31-12-2025;-4648,07;

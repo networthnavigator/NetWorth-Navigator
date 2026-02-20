@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NetWorthNavigator.Backend.Data;
+using NetWorthNavigator.Backend.Domain;
 using NetWorthNavigator.Backend.Domain.Entities;
 
 namespace NetWorthNavigator.Backend.Services;
@@ -27,16 +28,19 @@ public class BookingFromLineService
         int? ownAccountLedgerId = ownAccountLedgerIdOverride;
         if (ownAccountLedgerId == null && !string.IsNullOrWhiteSpace(line.OwnAccount))
         {
-            // First try OwnAccount rules (from Automated booking rules page)
+            // First try OwnAccount rules (from Automated booking rules page). More specific rules (more criteria) first.
             var ownAccountRules = await _context.BusinessRules
                 .AsNoTracking()
                 .Where(r => r.IsActive && r.MatchField.ToLower() == "ownaccount")
-                .OrderBy(r => r.SortOrder)
-                .ThenBy(r => r.Id)
                 .ToListAsync(ct);
-            foreach (var rule in ownAccountRules)
+            var ownOrdered = ownAccountRules
+                .OrderByDescending(r => BusinessRuleCriteria.GetCriteria(r).Count)
+                .ThenBy(r => r.SortOrder)
+                .ThenBy(r => r.Id)
+                .ToList();
+            foreach (var rule in ownOrdered)
             {
-                if (Matches(line, rule))
+                if (MatchesAll(line, rule))
                 {
                     ownAccountLedgerId = rule.LedgerAccountId;
                     break;
@@ -77,15 +81,19 @@ public class BookingFromLineService
         BusinessRule? appliedRule = null;
         if (contraLedgerAccountId == null)
         {
-            // Only contra rules (exclude OwnAccount rules which are for line 1)
+            // Only contra rules (exclude OwnAccount rules which are for line 1). More specific rules first.
             var rules = await _context.BusinessRules
                 .Include(r => r.LedgerAccount)
                 .Where(r => r.IsActive && r.MatchField.ToLower() != "ownaccount")
-                .OrderBy(r => r.SortOrder)
                 .ToListAsync(ct);
-            foreach (var rule in rules)
+            var contraOrdered = rules
+                .OrderByDescending(r => BusinessRuleCriteria.GetCriteria(r).Count)
+                .ThenBy(r => r.SortOrder)
+                .ThenBy(r => r.Id)
+                .ToList();
+            foreach (var rule in contraOrdered)
             {
-                if (Matches(line, rule))
+                if (MatchesAll(line, rule))
                 {
                     contraLedgerAccountId = rule.LedgerAccountId;
                     appliedRule = rule;
@@ -183,9 +191,109 @@ public class BookingFromLineService
         return (booking, contraLedgerAccountId != null);
     }
 
-    private static bool Matches(TransactionDocumentLine line, BusinessRule rule)
+    /// <summary>Adds contra line(s) from the first matching business rule to an existing booking. Does not remove any existing lines. Caller must SaveChanges.</summary>
+    /// <returns>True if one or more lines were added.</returns>
+    public async Task<bool> AddRuleLinesToExistingBookingAsync(Booking booking, TransactionDocumentLine line, CancellationToken ct = default)
     {
-        var value = rule.MatchField.ToUpperInvariant() switch
+        var lines = booking.Lines ?? new List<BookingLine>();
+        int nextLineNumber = lines.Count > 0 ? lines.Max(l => l.LineNumber) + 1 : 0;
+
+        var rules = await _context.BusinessRules
+            .Include(r => r.LedgerAccount)
+            .Where(r => r.IsActive && r.MatchField.ToLower() != "ownaccount")
+            .ToListAsync(ct);
+        var contraOrdered = rules
+            .OrderByDescending(r => BusinessRuleCriteria.GetCriteria(r).Count)
+            .ThenBy(r => r.SortOrder)
+            .ThenBy(r => r.Id)
+            .ToList();
+        BusinessRule? appliedRule = null;
+        int? contraLedgerAccountId = null;
+        foreach (var rule in contraOrdered)
+        {
+            if (MatchesAll(line, rule))
+            {
+                contraLedgerAccountId = rule.LedgerAccountId;
+                appliedRule = rule;
+                break;
+            }
+        }
+        if (contraLedgerAccountId == null)
+            return false;
+
+        var contraLedgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == contraLedgerAccountId.Value, ct);
+        if (!contraLedgerExists)
+            return false;
+        if (appliedRule?.SecondLedgerAccountId != null)
+        {
+            var secondExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == appliedRule.SecondLedgerAccountId.Value, ct);
+            if (!secondExists)
+                return false;
+        }
+
+        var amount = Math.Abs(line.Amount);
+        if (appliedRule?.SecondLedgerAccountId != null)
+        {
+            _context.BookingLines.Add(new BookingLine
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                LineNumber = nextLineNumber++,
+                LedgerAccountId = contraLedgerAccountId.Value,
+                DebitAmount = 0,
+                CreditAmount = 0,
+                Currency = line.Currency,
+                Description = line.ContraAccountName ?? line.Description,
+            });
+            _context.BookingLines.Add(new BookingLine
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                LineNumber = nextLineNumber,
+                LedgerAccountId = appliedRule.SecondLedgerAccountId.Value,
+                DebitAmount = 0,
+                CreditAmount = 0,
+                Currency = line.Currency,
+                Description = line.ContraAccountName ?? line.Description,
+            });
+        }
+        else
+        {
+            _context.BookingLines.Add(new BookingLine
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                LineNumber = nextLineNumber,
+                LedgerAccountId = contraLedgerAccountId.Value,
+                DebitAmount = line.Amount < 0 ? amount : 0,
+                CreditAmount = line.Amount > 0 ? amount : 0,
+                Currency = line.Currency,
+                Description = line.ContraAccountName ?? line.ContraAccount,
+            });
+        }
+        return true;
+    }
+
+    /// <summary>Returns true if the transaction line matches all criteria of the rule. Used to list bookings that match a rule.</summary>
+    public static bool MatchesRule(TransactionDocumentLine line, BusinessRule rule)
+    {
+        return MatchesAll(line, rule);
+    }
+
+    private static bool MatchesAll(TransactionDocumentLine line, BusinessRule rule)
+    {
+        var criteria = BusinessRuleCriteria.GetCriteria(rule);
+        foreach (var c in criteria)
+        {
+            if (!MatchesOne(line, c.MatchField, c.MatchOperator, c.MatchValue))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool MatchesOne(TransactionDocumentLine line, string matchField, string matchOperator, string matchValue)
+    {
+        var value = (matchField ?? "").ToUpperInvariant() switch
         {
             "OWNACCOUNT" => line.OwnAccount ?? "",
             "CONTRAACCOUNTNAME" => line.ContraAccountName ?? "",
@@ -193,11 +301,11 @@ public class BookingFromLineService
             "DESCRIPTION" => line.Description ?? "",
             _ => line.ContraAccountName ?? "",
         };
-        var match = rule.MatchValue ?? "";
-        return rule.MatchOperator.ToUpperInvariant() switch
+        var match = matchValue ?? "";
+        return (matchOperator ?? "").ToUpperInvariant() switch
         {
             "CONTAINS" => value.Contains(match, StringComparison.OrdinalIgnoreCase),
-            "EQUALS" => string.Equals(value, match, StringComparison.OrdinalIgnoreCase),
+            "EQUALS" => string.Equals(value.Trim(), match.Trim(), StringComparison.OrdinalIgnoreCase),
             "STARTSWITH" => value.StartsWith(match, StringComparison.OrdinalIgnoreCase),
             _ => value.Contains(match, StringComparison.OrdinalIgnoreCase),
         };

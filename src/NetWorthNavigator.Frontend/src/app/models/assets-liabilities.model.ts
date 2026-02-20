@@ -3,6 +3,8 @@ export interface BalanceSheetAccount {
   accountNumber?: string | null;
   name: string;
   currentBalance: number;
+  /** Opening balance offset when ledger has partial history. Displayed balance = openingBalanceOffset + ledger balance. */
+  openingBalanceOffset?: number | null;
   currency: string;
   sortOrder: number;
   ledgerAccountId?: number | null;
@@ -15,6 +17,8 @@ export interface InvestmentAccount {
   currentBalance: number;
   currency: string;
   sortOrder: number;
+  ledgerAccountId?: number | null;
+  ledgerAccountName?: string | null;
 }
 
 export interface Property {

@@ -27,4 +27,11 @@ export class TransactionLinesService {
   getOwnAccounts(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/own-accounts`);
   }
+
+  /** Suggested opening balance for an own-account (balance before earliest transaction). Used to pre-fill Opening balance offset. */
+  getSuggestedOpeningBalance(ownAccount: string): Observable<number | null> {
+    return this.http.get<number | null>(`${this.apiUrl}/suggested-opening-balance`, {
+      params: { ownAccount: ownAccount.trim() },
+    });
+  }
 }

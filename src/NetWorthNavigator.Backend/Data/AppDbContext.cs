@@ -89,8 +89,10 @@ public class AppDbContext : DbContext
             entity.Property(e => e.MatchField).HasMaxLength(64);
             entity.Property(e => e.MatchOperator).HasMaxLength(32);
             entity.Property(e => e.MatchValue).HasMaxLength(256);
+            entity.Property(e => e.CriteriaJson).HasMaxLength(2048);
             entity.Property(e => e.IsActive).HasConversion<int>();
             entity.Property(e => e.RequiresReview).HasConversion<int>();
+            entity.Property(e => e.IsSystemGenerated).HasConversion<int>();
         });
         modelBuilder.Entity<AccountStructure>(entity =>
         {
@@ -112,6 +114,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.AccountNumber).HasMaxLength(64);
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.CurrentBalance).HasPrecision(18, 2);
+            entity.Property(e => e.OpeningBalanceOffset).HasPrecision(18, 2);
             entity.Property(e => e.Currency).HasMaxLength(3);
             entity.HasOne(e => e.LedgerAccount).WithMany().HasForeignKey(e => e.LedgerAccountId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
@@ -121,6 +124,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(128);
             entity.Property(e => e.CurrentBalance).HasPrecision(18, 2);
             entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.HasOne(e => e.LedgerAccount).WithMany().HasForeignKey(e => e.LedgerAccountId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
         });
         modelBuilder.Entity<Property>(entity =>
         {

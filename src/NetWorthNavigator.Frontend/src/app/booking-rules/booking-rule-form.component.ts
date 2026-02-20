@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -15,7 +15,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { BookingRule, MATCH_FIELDS, MATCH_OPERATORS } from '../models/booking-rule.model';
 import { LedgerService } from '../services/ledger.service';
 import { BookingRulesService } from '../services/booking-rules.service';
+import { BookingsService } from '../services/bookings.service';
 import { LedgerAccount } from '../models/ledger-account.model';
+import { LedgerAccountSelectComponent } from '../components/ledger-account-select/ledger-account-select.component';
+
+export type ApplyRuleTo = '' | 'this' | 'pending' | 'all';
 
 interface CriterionRow {
   field: string;
@@ -36,6 +40,8 @@ export interface FromBookingPrefill {
   description?: string;
   amount?: number;
   currency?: string;
+  /** Transaction document line id (for "Apply to this booking"). */
+  documentLineId?: string;
 }
 
 @Component({
@@ -44,7 +50,6 @@ export interface FromBookingPrefill {
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -55,6 +60,7 @@ export interface FromBookingPrefill {
     MatIconModule,
     MatTooltipModule,
     MatSnackBarModule,
+    LedgerAccountSelectComponent,
   ],
   template: `
     <div class="page">
@@ -139,9 +145,7 @@ export interface FromBookingPrefill {
                 <span class="material-symbols-outlined">add</span>
                 Add criteria
               </button>
-              @if (form.criteria.length > 1) {
-                <p class="criteria-note">Currently only the first criterion is used.</p>
-              }
+              <p class="criteria-note">All criteria must match. More specific rules (more criteria) are applied first.</p>
             </div>
 
             <!-- Line items -->
@@ -161,15 +165,11 @@ export interface FromBookingPrefill {
                     @for (line of form.lineItems; track $index) {
                       <tr>
                         <td>
-                          <mat-form-field appearance="outline" class="cell-field">
-                            <input matInput type="text" [ngModel]="getLedgerInputDisplay($index)" (ngModelChange)="onLedgerInputChange($index, $event)"
-                              [matAutocomplete]="ledgerAuto" placeholder="Type to filter..." [ngModelOptions]="{standalone: true}">
-                            <mat-autocomplete #ledgerAuto="matAutocomplete" (optionSelected)="onLedgerSelected($index, $event)">
-                              @for (la of getFilteredLedgers(getLedgerSearchForRow($index)); track la.id) {
-                                <mat-option [value]="la">{{ la.code }} {{ la.name }}</mat-option>
-                              }
-                            </mat-autocomplete>
-                          </mat-form-field>
+                          <app-ledger-account-select
+                            [accounts]="ledgerAccounts"
+                            [value]="line.ledgerAccountId"
+                            (valueChange)="line.ledgerAccountId = $event"
+                            placeholder="Type to filter..." />
                         </td>
                         <td>
                           @if (form.matchField !== 'OwnAccount') {
@@ -200,6 +200,23 @@ export interface FromBookingPrefill {
                 Add line item
               </button>
               <p class="line-items-note">With 1 line item: contra of line 1. With 2 line items: both amounts 0 (e.g. interest + principal to fill in later).</p>
+            </div>
+
+            <!-- Apply to... (after save) -->
+            <div class="section apply-section">
+              <label class="section-label">Apply to...</label>
+              <p class="section-hint">After saving, optionally apply this rule to existing transaction lines by recreating their bookings.</p>
+              <mat-form-field appearance="outline" class="apply-field">
+                <mat-label>Apply to...</mat-label>
+                <mat-select [(ngModel)]="form.applyTo" name="applyTo">
+                  @if (prefillFromBooking?.documentLineId) {
+                    <mat-option value="this">This booking (the transaction you came from)</mat-option>
+                  }
+                  <mat-option value="pending">All pending (not yet approved) bookings</mat-option>
+                  <mat-option value="all">All bookings</mat-option>
+                  <mat-option value="">Don't apply now</mat-option>
+                </mat-select>
+              </mat-form-field>
             </div>
 
             <!-- Options -->
@@ -245,6 +262,8 @@ export interface FromBookingPrefill {
     .add-btn .material-symbols-outlined { font-size: 20px; width: 20px; height: 20px; margin-right: 4px; vertical-align: middle; }
     .criteria-note { margin: 6px 0 0; font-size: 0.8rem; color: var(--mat-sys-on-surface-variant, #666); }
     .line-items-note { margin: 8px 0 0; font-size: 0.8rem; color: var(--mat-sys-on-surface-variant, #666); }
+    .apply-section { }
+    .apply-field { min-width: 320px; }
     .options-section { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .sort-order-field { width: 120px; }
     mat-card-actions { padding: 16px 24px; }
@@ -254,6 +273,7 @@ export class BookingRuleFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly ledgerService = inject(LedgerService);
   private readonly rulesService = inject(BookingRulesService);
+  private readonly bookingsService = inject(BookingsService);
   private readonly snackBar = inject(MatSnackBar);
 
   private readonly router = inject(Router);
@@ -269,9 +289,6 @@ export class BookingRuleFormComponent implements OnInit {
 
   form = this.buildForm(null);
 
-  /** Per-row input text for ledger autocomplete (search or selected display). */
-  ledgerSearchInputs: string[] = [''];
-
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id && id !== 'new') {
@@ -284,7 +301,6 @@ export class BookingRuleFormComponent implements OnInit {
           const rule = rules.find((r) => r.id === numId);
           if (rule) {
             this.form = this.buildForm(rule);
-            this.syncLedgerSearchInputs();
           }
         });
         return;
@@ -292,63 +308,11 @@ export class BookingRuleFormComponent implements OnInit {
     }
     this.ledgerService.getAll().subscribe((list) => {
       this.ledgerAccounts = list;
-      this.syncLedgerSearchInputs();
-      if (this.prefillFromBooking) this.applyPrefillFromBooking();
-    });
-  }
-
-  private syncLedgerSearchInputs(): void {
-    const len = this.form.lineItems.length;
-    while (this.ledgerSearchInputs.length < len) this.ledgerSearchInputs.push('');
-    if (this.ledgerSearchInputs.length > len) this.ledgerSearchInputs = this.ledgerSearchInputs.slice(0, len);
-    for (let i = 0; i < len; i++) {
-      const id = this.form.lineItems[i]?.ledgerAccountId;
-      if (id != null) {
-        const display = this.getLedgerDisplay(id);
-        if (display) this.ledgerSearchInputs[i] = display;
+      if (this.prefillFromBooking) {
+        this.applyPrefillFromBooking();
+        if (this.prefillFromBooking.documentLineId) this.form.applyTo = 'this';
       }
-    }
-  }
-
-  getLedgerDisplay(id: number): string {
-    const la = this.ledgerAccounts.find((a) => a.id === id);
-    return la ? `${la.code} ${la.name}` : '';
-  }
-
-  getLedgerInputDisplay(rowIndex: number): string {
-    const line = this.form.lineItems[rowIndex];
-    const search = this.ledgerSearchInputs[rowIndex];
-    if (line?.ledgerAccountId != null && (search === undefined || search === '')) return this.getLedgerDisplay(line.ledgerAccountId);
-    return search ?? '';
-  }
-
-  getLedgerSearchForRow(rowIndex: number): string {
-    return this.ledgerSearchInputs[rowIndex] ?? '';
-  }
-
-  onLedgerInputChange(rowIndex: number, value: string): void {
-    this.ledgerSearchInputs[rowIndex] = value ?? '';
-    const line = this.form.lineItems[rowIndex];
-    const v = (value ?? '').trim();
-    if (v === '') {
-      line.ledgerAccountId = null;
-    } else if (line.ledgerAccountId != null && this.getLedgerDisplay(line.ledgerAccountId) !== v) {
-      line.ledgerAccountId = null;
-    }
-  }
-
-  onLedgerSelected(rowIndex: number, event: { option: { value: LedgerAccount } }): void {
-    const la = event.option.value;
-    this.form.lineItems[rowIndex].ledgerAccountId = la.id;
-    this.ledgerSearchInputs[rowIndex] = `${la.code} ${la.name}`;
-  }
-
-  getFilteredLedgers(search: string): LedgerAccount[] {
-    const q = (search ?? '').trim().toLowerCase();
-    if (q === '') return this.ledgerAccounts;
-    return this.ledgerAccounts.filter(
-      (la) => `${la.code} ${la.name}`.toLowerCase().includes(q)
-    );
+    });
   }
 
   private applyPrefillFromBooking(): void {
@@ -379,16 +343,17 @@ export class BookingRuleFormComponent implements OnInit {
   }
 
   private buildForm(r: BookingRule | null) {
-    const matchField = r?.matchField ?? 'ContraAccountName';
-    const matchOperator = r?.matchOperator ?? 'Contains';
-    const matchValue = r?.matchValue ?? '';
+    const criteriaList = r?.criteria && r.criteria.length > 0
+      ? r.criteria.map(c => ({ field: c.matchField, operator: c.matchOperator, value: c.matchValue }))
+      : [{ field: r?.matchField ?? 'ContraAccountName', operator: r?.matchOperator ?? 'Contains', value: r?.matchValue ?? '' }];
+    const first = criteriaList[0];
     const hasSecond = (r?.secondLedgerAccountId ?? 0) > 0;
     return {
       name: r?.name ?? '',
-      criteria: [{ field: matchField, operator: matchOperator, value: matchValue }] as CriterionRow[],
-      matchField,
-      matchOperator,
-      matchValue,
+      criteria: criteriaList as CriterionRow[],
+      matchField: first?.field ?? 'ContraAccountName',
+      matchOperator: first?.operator ?? 'Contains',
+      matchValue: first?.value ?? '',
       lineItems: hasSecond && r
         ? [
             { ledgerAccountId: r.ledgerAccountId as number | null, amountType: 'Zero' as const },
@@ -398,6 +363,7 @@ export class BookingRuleFormComponent implements OnInit {
       sortOrder: r?.sortOrder ?? 0,
       isActive: r?.isActive ?? true,
       requiresReview: r?.requiresReview ?? true,
+      applyTo: '' as ApplyRuleTo,
     };
   }
 
@@ -428,13 +394,11 @@ export class BookingRuleFormComponent implements OnInit {
   addLineItem(): void {
     if (this.form.lineItems.length >= 2) return;
     this.form.lineItems.push({ ledgerAccountId: null, amountType: 'Zero' });
-    this.ledgerSearchInputs.push('');
   }
 
   removeLineItem(index: number): void {
     if (this.form.lineItems.length <= 1) return;
     this.form.lineItems.splice(index, 1);
-    this.ledgerSearchInputs.splice(index, 1);
   }
 
   cancel(): void {
@@ -465,17 +429,22 @@ export class BookingRuleFormComponent implements OnInit {
   }
 
   save(): void {
-    const c = this.form.criteria[0];
-    if (!c || !this.form.name?.trim()) return;
+    if (!this.form.criteria.length || !this.form.name?.trim()) return;
     const first = this.form.lineItems[0];
     if (!first?.ledgerAccountId) return;
     const second = this.form.lineItems[1];
     const secondLedgerId = second?.ledgerAccountId && second.ledgerAccountId > 0 ? second.ledgerAccountId : undefined;
-    const payload = {
-      name: this.form.name.trim(),
+    const criteria = this.form.criteria.map(c => ({
       matchField: c.field,
       matchOperator: c.operator,
       matchValue: c.value?.trim() ?? '',
+    }));
+    const payload = {
+      name: this.form.name.trim(),
+      criteria,
+      matchField: criteria[0]?.matchField ?? 'ContraAccountName',
+      matchOperator: criteria[0]?.matchOperator ?? 'Contains',
+      matchValue: criteria[0]?.matchValue ?? '',
       ledgerAccountId: first.ledgerAccountId,
       secondLedgerAccountId: secondLedgerId,
       sortOrder: Number(this.form.sortOrder) || 0,
@@ -484,12 +453,43 @@ export class BookingRuleFormComponent implements OnInit {
     };
 
     this.saving = true;
+    const showConflictWarning = (res: { conflictRuleIds?: number[] }) => {
+      if (res.conflictRuleIds && res.conflictRuleIds.length > 0) {
+        this.snackBar.open(
+          'Rule saved. It shares criteria with other rule(s). More specific rules (more criteria) are applied first.',
+          undefined,
+          { duration: 5000 }
+        );
+      }
+    };
+    const doAfterSave = () => {
+      const applyTo = (this.form.applyTo ?? '') as ApplyRuleTo;
+      if (!applyTo) {
+        this.router.navigate(this.prefillFromBooking ? ['/bookings'] : ['/booking-rules']);
+        return;
+      }
+      const scope = applyTo === 'this' ? 'ThisBooking' : applyTo === 'pending' ? 'PendingOnly' : 'All';
+      const docLineId = applyTo === 'this' && this.prefillFromBooking?.documentLineId ? this.prefillFromBooking.documentLineId : undefined;
+      this.bookingsService.recreateByScope(scope, docLineId).subscribe({
+        next: (result) => {
+          let msg = `Rule saved. Applied to ${result.processed} transaction(s), ${result.created} booking(s) created.`;
+          if (result.errors?.length) msg += ` ${result.errors.length} error(s).`;
+          this.snackBar.open(msg, undefined, { duration: result.errors?.length ? 6000 : 4000 });
+          this.router.navigate(this.prefillFromBooking ? ['/bookings'] : ['/booking-rules']);
+        },
+        error: (err) => {
+          this.snackBar.open(err?.error?.error ?? 'Rule saved but apply failed', undefined, { duration: 4000 });
+          this.router.navigate(this.prefillFromBooking ? ['/bookings'] : ['/booking-rules']);
+        },
+      });
+    };
     if (this.isEdit && this.ruleId != null) {
       this.rulesService.update(this.ruleId, payload).subscribe({
-        next: () => {
+        next: (res) => {
           this.saving = false;
           this.snackBar.open('Rule updated', undefined, { duration: 2000 });
-          this.router.navigate(['/booking-rules']);
+          showConflictWarning(res);
+          doAfterSave();
         },
         error: (err) => {
           this.saving = false;
@@ -498,10 +498,11 @@ export class BookingRuleFormComponent implements OnInit {
       });
     } else {
       this.rulesService.create(payload).subscribe({
-        next: () => {
+        next: (res) => {
           this.saving = false;
           this.snackBar.open('Rule added', undefined, { duration: 2000 });
-          this.router.navigate(['/booking-rules']);
+          showConflictWarning(res);
+          doAfterSave();
         },
         error: (err) => {
           this.saving = false;

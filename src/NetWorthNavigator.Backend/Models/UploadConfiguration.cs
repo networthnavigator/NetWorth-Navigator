@@ -63,6 +63,8 @@ public class UploadPreviewLineDto
     public string Name { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "EUR";
-    /// <summary>"import" = will be imported, "skip" = duplicate or invalid</summary>
+    /// <summary>"import" = will be imported, "skip" = duplicate, invalid, or account not tracked</summary>
     public string Action { get; set; } = "import";
+    /// <summary>Optional reason when Action is "skip", e.g. "Account not tracked", "Duplicate"</summary>
+    public string? ActionReason { get; set; }
 }

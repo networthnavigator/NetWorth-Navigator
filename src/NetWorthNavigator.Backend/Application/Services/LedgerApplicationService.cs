@@ -18,19 +18,23 @@ public sealed class LedgerApplicationService : ILedgerApplicationService
     public async Task<IReadOnlyList<LedgerAccountDto>> GetAllAsync(CancellationToken ct = default)
     {
         var list = await _ledger.GetAllAsync(ct);
-        return list.Select(MapToDto).ToList();
+        var pathByStructureId = await GetStructurePathLookupAsync(ct);
+        return list.Select(l => MapToDto(l, pathByStructureId)).ToList();
     }
 
     public async Task<IReadOnlyList<LedgerAccountDto>> GetAssetsAsync(CancellationToken ct = default)
     {
         var list = await _ledger.GetByAssetsCategoryAsync(ct);
-        return list.Select(MapToDto).ToList();
+        var pathByStructureId = await GetStructurePathLookupAsync(ct);
+        return list.Select(l => MapToDto(l, pathByStructureId)).ToList();
     }
 
     public async Task<LedgerAccountDto?> GetByIdAsync(int id, CancellationToken ct = default)
     {
         var entity = await _ledger.GetByIdAsync(id, ct);
-        return entity == null ? null : MapToDto(entity);
+        if (entity == null) return null;
+        var pathByStructureId = await GetStructurePathLookupAsync(ct);
+        return MapToDto(entity, pathByStructureId);
     }
 
     public async Task<LedgerAccountDto> CreateAsync(LedgerAccountCreateDto dto, CancellationToken ct = default)
@@ -51,7 +55,8 @@ public sealed class LedgerApplicationService : ILedgerApplicationService
             SortOrder = maxSort + 1,
         };
         var added = await _ledger.AddAsync(entity, ct);
-        return MapToDto(added);
+        var pathByStructureId = await GetStructurePathLookupAsync(ct);
+        return MapToDto(added, pathByStructureId);
     }
 
     public async Task<LedgerAccountDto?> UpdateAsync(int id, LedgerAccountUpdateDto dto, CancellationToken ct = default)
@@ -72,7 +77,9 @@ public sealed class LedgerApplicationService : ILedgerApplicationService
 
         await _ledger.UpdateAsync(entity, ct);
         var updated = await _ledger.GetByIdAsync(id, ct);
-        return updated == null ? null : MapToDto(updated);
+        if (updated == null) return null;
+        var pathByStructureId = await GetStructurePathLookupAsync(ct);
+        return MapToDto(updated, pathByStructureId);
     }
 
     public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
@@ -83,13 +90,35 @@ public sealed class LedgerApplicationService : ILedgerApplicationService
         return true;
     }
 
-    private static LedgerAccountDto MapToDto(LedgerAccount l)
+    /// <summary>Builds structure id -> full path (e.g. "Activa > Verzekeringen > Autoverzekering").</summary>
+    private async Task<IReadOnlyDictionary<int, string>> GetStructurePathLookupAsync(CancellationToken ct)
     {
+        var all = await _structure.GetAllOrderedAsync(ct);
+        var byId = all.ToDictionary(a => a.Id);
+        var result = new Dictionary<int, string>();
+        foreach (var a in all)
+        {
+            var path = new List<string>();
+            var current = a;
+            while (current != null)
+            {
+                path.Insert(0, current.Name);
+                current = current.ParentId != null && byId.TryGetValue(current.ParentId.Value, out var parent) ? parent : null;
+            }
+            result[a.Id] = string.Join(" > ", path);
+        }
+        return result;
+    }
+
+    private static LedgerAccountDto MapToDto(LedgerAccount l, IReadOnlyDictionary<int, string> pathByStructureId)
+    {
+        var path = pathByStructureId.TryGetValue(l.AccountStructureId, out var p) ? p : "";
         return new LedgerAccountDto
         {
             Id = l.Id,
             AccountStructureId = l.AccountStructureId,
             AccountStructureName = l.AccountStructure?.Name ?? "",
+            AccountStructurePath = path,
             Code = l.Code,
             Name = l.Name,
             SortOrder = l.SortOrder,

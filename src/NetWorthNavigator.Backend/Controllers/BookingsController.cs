@@ -94,13 +94,21 @@ public class BookingsController : ControllerBase
         return Ok(dto);
     }
 
-    /// <summary>PUT /api/bookings/{id}/reviewed - Mark a booking as reviewed/approved by the user.</summary>
+    /// <summary>PUT /api/bookings/{id}/reviewed - Mark a booking as reviewed/approved by the user. Fails if the booking is not in balance (debits ≠ credits).</summary>
     [HttpPut("{id:guid}/reviewed")]
     public async Task<IActionResult> MarkReviewed(Guid id, CancellationToken ct = default)
     {
-        var booking = await _context.Bookings.FindAsync([id], ct);
+        var booking = await _context.Bookings.Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == id, ct);
         if (booking == null)
             return NotFound(new { error = "Booking not found" });
+        var lines = booking.Lines ?? new List<BookingLine>();
+        foreach (var group in lines.GroupBy(l => l.Currency ?? "EUR"))
+        {
+            var totalDebit = group.Sum(l => l.DebitAmount);
+            var totalCredit = group.Sum(l => l.CreditAmount);
+            if (Math.Abs(totalDebit - totalCredit) > 0.001m)
+                return BadRequest(new { error = "Booking is not in balance (debits must equal credits). Add or adjust lines so that total debits equal total credits per currency." });
+        }
         booking.ReviewedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
         return NoContent();
@@ -132,6 +140,72 @@ public class BookingsController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    /// <summary>POST /api/bookings/recreate-by-scope - Recreate bookings for transaction lines so the current rules (e.g. a just-saved rule) are applied. Use after creating/editing a booking rule.</summary>
+    [HttpPost("recreate-by-scope")]
+    public async Task<ActionResult<RecreateByScopeResult>> RecreateByScope(
+        [FromBody] RecreateByScopeRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(request.Scope))
+            return BadRequest(new { error = "Scope is required (ThisBooking, PendingOnly, or All)" });
+        var scope = request.Scope.Trim();
+        List<Guid> lineIdsToProcess;
+        if (scope.Equals("ThisBooking", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!request.DocumentLineId.HasValue)
+                return BadRequest(new { error = "DocumentLineId is required when scope is ThisBooking" });
+            lineIdsToProcess = new List<Guid> { request.DocumentLineId.Value };
+        }
+        else if (scope.Equals("PendingOnly", StringComparison.OrdinalIgnoreCase))
+        {
+            var allLineIds = await _context.TransactionDocumentLines.Select(l => l.Id).ToListAsync(ct);
+            var reviewedSourceIds = await _context.Bookings
+                .Where(b => b.SourceDocumentLineId != null && b.ReviewedAt != null)
+                .Select(b => b.SourceDocumentLineId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+            lineIdsToProcess = allLineIds.Where(id => !reviewedSourceIds.Contains(id)).ToList();
+        }
+        else if (scope.Equals("All", StringComparison.OrdinalIgnoreCase))
+        {
+            lineIdsToProcess = await _context.TransactionDocumentLines.Select(l => l.Id).ToListAsync(ct);
+        }
+        else
+            return BadRequest(new { error = "Scope must be ThisBooking, PendingOnly, or All" });
+
+        int processed = 0;
+        int created = 0;
+        var errors = new List<string>();
+        foreach (var lineId in lineIdsToProcess)
+        {
+            var line = await _context.TransactionDocumentLines.Include(l => l.Document).FirstOrDefaultAsync(l => l.Id == lineId, ct);
+            if (line == null) continue;
+            var existing = await _context.Bookings.Include(b => b.Lines).FirstOrDefaultAsync(b => b.SourceDocumentLineId == lineId, ct);
+            try
+            {
+                if (existing != null)
+                {
+                    // Add rule-derived line(s) to existing booking; do not replace existing lines.
+                    await _bookingFromLineService.AddRuleLinesToExistingBookingAsync(existing, line, ct);
+                    await _context.SaveChangesAsync(ct);
+                    processed++;
+                }
+                else
+                {
+                    await _bookingFromLineService.CreateBookingForLineAsync(line, line.Document, null, null, ct);
+                    await _context.SaveChangesAsync(ct);
+                    processed++;
+                    created++;
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Line {lineId}: {ex.Message}");
+            }
+        }
+        return Ok(new RecreateByScopeResult { Processed = processed, Created = created, Errors = errors.Count > 0 ? errors : null });
     }
 
     /// <summary>POST /api/bookings/{bookingId}/lines - Add a line to an existing booking.</summary>
@@ -203,6 +277,20 @@ public class CreateBookingFromLineRequest
     public int? OwnAccountLedgerId { get; set; }
     /// <summary>Ledger account for the contra side. If null, first matching BusinessRule is used.</summary>
     public int? ContraLedgerAccountId { get; set; }
+}
+
+public class RecreateByScopeRequest
+{
+    /// <summary>ThisBooking = single line (DocumentLineId required), PendingOnly = lines without reviewed booking, All = all lines.</summary>
+    public string Scope { get; set; } = "";
+    public Guid? DocumentLineId { get; set; }
+}
+
+public class RecreateByScopeResult
+{
+    public int Processed { get; set; }
+    public int Created { get; set; }
+    public List<string>? Errors { get; set; }
 }
 
 public class BookingWithLinesDto

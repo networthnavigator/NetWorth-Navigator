@@ -8,4 +8,7 @@ public class InvestmentAccount
     public decimal CurrentBalance { get; set; }
     public string Currency { get; set; } = "EUR";
     public int SortOrder { get; set; }
+    /// <summary>Optional link to a ledger account (e.g. for double-entry or reporting).</summary>
+    public int? LedgerAccountId { get; set; }
+    public LedgerAccount? LedgerAccount { get; set; }
 }
