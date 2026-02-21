@@ -22,6 +22,8 @@ export interface BookingRule {
   secondLedgerAccountId?: number | null;
   secondLedgerAccountCode?: string | null;
   secondLedgerAccountName?: string | null;
+  /** Full list of line items (when multiple). Order preserved. Overrides ledgerAccountId+secondLedgerAccountId when set. */
+  lineItems?: { ledgerAccountId: number; amountType: string }[];
   sortOrder: number;
   isActive: boolean;
   /** When true, bookings created with this rule need user review before approved. Default true for contra rules. */

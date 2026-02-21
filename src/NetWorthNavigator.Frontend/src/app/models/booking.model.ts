@@ -9,6 +9,10 @@ export interface BookingLineDto {
   creditAmount: number;
   currency: string;
   description?: string;
+  /** When true, this line must be approved by the user. Line 1 (own account) is always false. */
+  requiresReview?: boolean;
+  /** When set, the line has been approved by the user. */
+  reviewedAt?: string | null;
 }
 
 /** Booking with its lines (e.g. from GET by source document line). */

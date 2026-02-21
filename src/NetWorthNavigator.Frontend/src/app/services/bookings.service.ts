@@ -37,9 +37,9 @@ export class BookingsService {
     });
   }
 
-  /** Mark a booking as reviewed/approved by the user. */
-  markReviewed(bookingId: string): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/${bookingId}/reviewed`, {});
+  /** Mark a line item as approved by the user. */
+  approveLine(bookingId: string, lineId: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${bookingId}/lines/${lineId}/reviewed`, {});
   }
 
   /** Recreate bookings for the given scope so current rules are applied. Scope: ThisBooking (documentLineId required), PendingOnly, All. */

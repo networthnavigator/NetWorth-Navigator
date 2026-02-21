@@ -11,6 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { TransactionLinesService } from '../services/transaction-lines.service';
@@ -73,6 +74,7 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
     MatInputModule,
     MatSelectModule,
     MatIconModule,
+    MatCheckboxModule,
     MatDialogModule,
   ],
   template: `
@@ -90,12 +92,11 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
           </span>
         </mat-card-header>
         <div class="toolbar">
-          <mat-form-field appearance="outline" class="search-field">
-            <mat-label>Search</mat-label>
-            <input matInput [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange()" placeholder="Search in date, account, description…">
-            <span matPrefix class="material-symbols-outlined search-icon">search</span>
-            @if (searchQuery) {
-              <button matSuffix mat-icon-button (click)="searchQuery = ''; onSearchChange()" aria-label="Clear search">
+          <mat-form-field appearance="outline" class="counterparty-field">
+            <mat-label>Counterparty name</mat-label>
+            <input matInput [ngModel]="filterContraNameContains()" (ngModelChange)="filterContraNameContains.set($event)" placeholder="e.g. Lidl">
+            @if (filterContraNameContains()) {
+              <button matSuffix mat-icon-button (click)="filterContraNameContains.set('')" aria-label="Clear">
                 <span class="material-symbols-outlined">close</span>
               </button>
             }
@@ -104,33 +105,27 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
             <span class="material-symbols-outlined">filter_list</span>
             Filter
           </button>
+          <mat-checkbox [ngModel]="hideCompleted()" (ngModelChange)="hideCompleted.set($event)" class="hide-completed-checkbox">
+            Hide completed
+          </mat-checkbox>
         </div>
         @if (filterPanelOpen) {
           <div class="filter-panel">
             <div class="filter-row">
               <mat-form-field appearance="outline">
                 <mat-label>Date from</mat-label>
-                <input matInput type="date" [(ngModel)]="filterDateFrom" (ngModelChange)="applyFilters()">
+                <input matInput type="date" [ngModel]="filterDateFrom()" (ngModelChange)="filterDateFrom.set($event)">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Date to</mat-label>
-                <input matInput type="date" [(ngModel)]="filterDateTo" (ngModelChange)="applyFilters()">
+                <input matInput type="date" [ngModel]="filterDateTo()" (ngModelChange)="filterDateTo.set($event)">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Own account</mat-label>
-                <mat-select [(ngModel)]="filterOwnAccount" (ngModelChange)="applyFilters()">
+                <mat-select [ngModel]="filterOwnAccount()" (ngModelChange)="filterOwnAccount.set($event)">
                   <mat-option [value]="''">— All —</mat-option>
                   @for (acc of distinctOwnAccounts(); track acc) {
                     <mat-option [value]="acc">{{ acc }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Counterparty</mat-label>
-                <mat-select [(ngModel)]="filterContraName" (ngModelChange)="applyFilters()">
-                  <mat-option [value]="''">— All —</mat-option>
-                  @for (name of distinctContraNames(); track name) {
-                    <mat-option [value]="name">{{ name || '(empty)' }}</mat-option>
                   }
                 </mat-select>
               </mat-form-field>
@@ -142,7 +137,7 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
           @if (loading) {
             <p class="loading">Loading...</p>
           } @else if (filteredGroups().length === 0) {
-            <p class="empty">{{ hasActiveFilters() || searchQuery ? 'No bookings match your search or filters.' : 'No bookings yet.' }}</p>
+            <p class="empty">{{ hasActiveFilters() ? 'No bookings match your filters.' : 'No bookings yet.' }}</p>
           } @else {
             <mat-accordion class="transactions-accordion" multi>
               @for (group of filteredGroups(); track group.ownAccount) {
@@ -169,18 +164,9 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
                       <ng-container matColumnDef="balance">
                         <th mat-header-cell *matHeaderCellDef class="balance-header"></th>
                         <td mat-cell *matCellDef="let row" class="balance-cell">
-                          @let icon = getBalanceIcon(row);
+                          @let icon = getStatusIcon(row);
                           @if (icon) {
-                            <span class="material-symbols-outlined balance-icon" [class.in-balance]="icon === 'check_circle'" [class.out-of-balance]="icon === 'warning'" [attr.aria-label]="icon === 'check_circle' ? 'In balance' : 'Out of balance'" matTooltip="{{ icon === 'check_circle' ? 'In balance' : 'Out of balance' }}">{{ icon }}</span>
-                          }
-                        </td>
-                      </ng-container>
-                      <ng-container matColumnDef="review">
-                        <th mat-header-cell *matHeaderCellDef class="review-header"></th>
-                        <td mat-cell *matCellDef="let row" class="review-cell">
-                          @let reviewIcon = getReviewIcon(row);
-                          @if (reviewIcon) {
-                            <span class="material-symbols-outlined review-icon" [class.review-pending]="reviewIcon === 'schedule'" [class.review-done]="reviewIcon === 'verified'" [attr.aria-label]="reviewIcon === 'verified' ? 'Reviewed' : 'Requires review'" matTooltip="{{ reviewIcon === 'verified' ? 'Reviewed' : 'Requires review' }}">{{ reviewIcon }}</span>
+                            <span class="material-symbols-outlined balance-icon" [class.complete]="icon === 'check_circle'" [class.needs-review]="icon === 'warning'" [attr.aria-label]="icon === 'check_circle' ? 'Complete' : 'Needs review'" matTooltip="{{ icon === 'check_circle' ? 'Complete' : 'Needs review' }}">{{ icon }}</span>
                           }
                         </td>
                       </ng-container>
@@ -223,39 +209,38 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
                                 @default {
                                   @let data = getLineItemsState(row.id);
                                   @if (data && data !== 'loading' && data.lines) {
-                                    @if (data.requiresReview !== false) {
-                                      <div class="review-status">
-                                        @if (data.reviewedAt) {
-                                          <span class="material-symbols-outlined review-icon">verified</span>
-                                          Reviewed {{ formatDate(data.reviewedAt) }}
-                                        } @else {
-                                          <span class="material-symbols-outlined review-icon pending">schedule</span>
-                                          Requires review
-                                          <button mat-stroked-button (click)="markAsReviewed(row, data); $event.stopPropagation()" class="mark-reviewed-btn"
-                                            [disabled]="!bookingInBalance(data.lines)"
-                                            [matTooltip]="!bookingInBalance(data.lines) ? 'Booking must be in balance (debits = credits) to mark as reviewed' : null">
-                                            <span class="material-symbols-outlined">check_circle</span>
-                                            Mark as reviewed
-                                          </button>
-                                        }
-                                      </div>
-                                    }
                                     <table class="line-items-table">
                                       <thead>
                                         <tr>
+                                          <th class="nr-col">Nr</th>
                                           <th>Account</th>
                                           <th>Debit</th>
                                           <th>Credit</th>
                                           <th>Currency</th>
+                                          <th class="approval-col">Approval</th>
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        @for (line of data.lines; track line.id) {
+                                        @for (line of data.lines; track line.id; let i = $index) {
                                           <tr>
+                                            <td class="nr-col mono">{{ i + 1 }}</td>
                                             <td class="mono">{{ line.ledgerAccountCode ?? line.ledgerAccountName ?? line.ledgerAccountId }}</td>
                                             <td class="mono amount">{{ line.debitAmount > 0 ? formatAmount(line.debitAmount, line.currency) : '—' }}</td>
                                             <td class="mono amount">{{ line.creditAmount > 0 ? formatAmount(line.creditAmount, line.currency) : '—' }}</td>
                                             <td>{{ line.currency }}</td>
+                                            <td class="approval-col">
+                                              @if (line.requiresReview) {
+                                                @if (line.reviewedAt) {
+                                                  <span class="material-symbols-outlined approved-icon" matTooltip="Approved {{ formatDate(line.reviewedAt) }}">check_circle</span>
+                                                } @else {
+                                                  <button mat-icon-button (click)="approveLine(row, data, line); $event.stopPropagation()" matTooltip="Approve line">
+                                                    <span class="material-symbols-outlined">radio_button_unchecked</span>
+                                                  </button>
+                                                }
+                                              } @else {
+                                                <span class="material-symbols-outlined auto-approved-icon" matTooltip="Auto-approved">check_circle</span>
+                                              }
+                                            </td>
                                           </tr>
                                         }
                                       </tbody>
@@ -325,9 +310,9 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
     .transactions-page { position: relative; min-height: 200px; }
     mat-card-header { display: flex; align-items: center; }
     .toolbar { display: flex; align-items: center; gap: 16px; padding: 0 16px 16px; flex-wrap: wrap; }
-    .search-field { flex: 1; min-width: 200px; max-width: 400px; }
-    .search-field .search-icon { font-size: 20px; margin-right: 4px; color: var(--mat-sys-on-surface-variant, #666); }
+    .counterparty-field { min-width: 200px; max-width: 280px; }
     .toolbar button.active { background: rgba(25, 118, 210, 0.08); }
+    .hide-completed-checkbox { margin-left: 8px; }
     .filter-panel { padding: 0 16px 16px; border-top: 1px solid rgba(0,0,0,0.08); margin-top: -8px; padding-top: 16px; }
     html.theme-dark .filter-panel { border-top-color: rgba(255,255,255,0.12); }
     .filter-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
@@ -341,33 +326,31 @@ const METADATA_FIELDS: { key: keyof TransactionLine; label: string }[] = [
     .table-wrap { overflow-x: auto; margin-top: 8px; }
     .transactions-table { width: 100%; min-width: 400px; }
     .transactions-table th, .transactions-table td { padding: 8px 12px; }
-    .transactions-table .expand-header, .transactions-table .details-header, .transactions-table .balance-header, .transactions-table .review-header { width: 48px; }
-    .transactions-table .balance-cell, .transactions-table .review-cell { padding-right: 4px; }
+    .transactions-table .expand-header, .transactions-table .details-header, .transactions-table .balance-header { width: 48px; }
+    .transactions-table .balance-cell { padding-right: 4px; }
     .transactions-table .balance-icon { font-size: 22px; }
-    .transactions-table .review-icon { font-size: 22px; }
-    .transactions-table .review-icon.review-pending { color: var(--mat-sys-on-surface-variant, #666); }
-    .transactions-table .review-icon.review-done { color: #2e7d32; }
-    html.theme-dark .transactions-table .review-icon.review-done { color: #81c784; }
-    .transactions-table .balance-icon.in-balance { color: #2e7d32; }
-    .transactions-table .balance-icon.out-of-balance { color: #c62828; }
-    html.theme-dark .transactions-table .balance-icon.in-balance { color: #81c784; }
-    html.theme-dark .transactions-table .balance-icon.out-of-balance { color: #e57373; }
+    .transactions-table .balance-icon.complete { color: #2e7d32; }
+    .transactions-table .balance-icon.needs-review { color: #c62828; }
+    html.theme-dark .transactions-table .balance-icon.complete { color: #81c784; }
+    html.theme-dark .transactions-table .balance-icon.needs-review { color: #e57373; }
     .transactions-table .expanded-cell { padding: 0; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,0.12); }
     html.theme-dark .transactions-table .expanded-cell { border-bottom-color: rgba(255,255,255,0.12); }
     .detail-row { height: 0; }
     .detail-row .mat-mdc-cell { border-bottom-width: 0; }
     .line-items-content { padding: 12px 16px; background: rgba(0,0,0,0.02); }
     html.theme-dark .line-items-content { background: rgba(255,255,255,0.04); }
-    .review-status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.9rem; flex-wrap: wrap; }
-    .review-status .review-icon { font-size: 20px; }
-    .review-status .review-icon.pending { color: var(--mat-sys-on-surface-variant, #666); }
-    .review-status .mark-reviewed-btn .material-symbols-outlined { font-size: 18px; vertical-align: middle; margin-right: 4px; }
+    .line-items-table .approval-col { width: 56px; text-align: center; }
+    .line-items-table .approved-icon, .line-items-table .auto-approved-icon { font-size: 20px; }
+    .line-items-table .approved-icon { color: #2e7d32; }
+    html.theme-dark .line-items-table .approved-icon { color: #81c784; }
+    .line-items-table .auto-approved-icon { color: var(--mat-sys-on-surface-variant, #666); opacity: 0.8; }
     .line-items-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .line-items-actions button .material-symbols-outlined, .line-items-actions a .material-symbols-outlined { font-size: 18px; vertical-align: middle; margin-right: 4px; }
     .line-items-actions .create-rule-btn { color: var(--mat-sys-primary, #1976d2); }
     .line-items-loading, .line-items-empty { margin: 0; padding: 8px 0; color: var(--mat-sys-on-surface-variant, #666); font-size: 0.9rem; }
     .line-items-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .line-items-table th, .line-items-table td { padding: 6px 12px; text-align: left; border-bottom: 1px solid rgba(0,0,0,0.08); }
+    .line-items-table .nr-col { width: 48px; text-align: right; }
     .line-items-table th { font-weight: 600; color: var(--mat-sys-on-surface-variant, #666); }
     .line-items-table .amount { white-space: nowrap; }
     .mono { font-family: ui-monospace, monospace; font-size: 0.85em; }
@@ -409,93 +392,77 @@ export class TransactiesComponent implements OnInit {
 
   groups = signal<TransactionsByAccount[]>([]);
   loading = false;
-  displayedColumns: string[] = ['expand', 'balance', 'review', 'date', 'contraAccountName', 'description', 'amount', 'details'];
+  displayedColumns: string[] = ['expand', 'balance', 'date', 'contraAccountName', 'description', 'amount', 'details'];
   selectedTransaction: TransactionLine | null = null;
   readonly normalDetailFields = NORMAL_DETAIL_FIELDS;
   readonly metadataFields = METADATA_FIELDS;
 
-  searchQuery = '';
   filterPanelOpen = false;
-  filterDateFrom = '';
-  filterDateTo = '';
-  filterOwnAccount = '';
-  filterContraName = '';
+  filterDateFrom = signal('');
+  filterDateTo = signal('');
+  filterOwnAccount = signal('');
+  filterContraNameContains = signal('');
+  hideCompleted = signal(false);
 
-  /** Header (normal) field keys used for search – not metadata. */
-  private readonly searchableKeys: (keyof TransactionLine)[] = [
-    'date', 'ownAccount', 'contraAccount', 'contraAccountName', 'amount', 'currency',
-    'movementType', 'movementTypeLabel', 'description', 'status', 'userComments', 'tag',
-  ];
+  /** Source document line IDs of bookings that are complete (in balance + all lines approved). Updated on load. */
+  completeSourceIds = signal<Set<string>>(new Set());
 
   distinctOwnAccounts = computed(() => {
     const set = new Set<string>();
     this.groups().forEach(g => set.add(g.ownAccount));
     return Array.from(set).sort();
   });
-  distinctContraNames = computed(() => {
-    const set = new Set<string>();
-    this.groups().forEach(g => g.transactions.forEach(t => set.add(t.contraAccountName ?? '')));
-    return Array.from(set).sort((a, b) => (a || '').localeCompare(b || ''));
-  });
-
   filteredGroups = computed(() => {
     let list = this.groups();
-    const q = this.searchQuery.trim().toLowerCase();
-    const dateFrom = this.filterDateFrom ? new Date(this.filterDateFrom) : null;
-    const dateTo = this.filterDateTo ? new Date(this.filterDateTo) : null;
-    const own = this.filterOwnAccount.trim();
-    const contra = this.filterContraName.trim();
+    const contraContains = this.filterContraNameContains().trim().toLowerCase();
+    const dateFrom = this.filterDateFrom() ? new Date(this.filterDateFrom()) : null;
+    const dateTo = this.filterDateTo() ? new Date(this.filterDateTo()) : null;
+    const own = this.filterOwnAccount().trim();
+    const completeIds = this.completeSourceIds();
 
-    if (q || dateFrom || dateTo || own || contra) {
-      list = list.map(group => {
-        let transactions = group.transactions;
-        if (q) {
-          transactions = transactions.filter(t => this.matchesSearch(t, q));
-        }
-        if (dateFrom || dateTo) {
-          const dateToEnd = dateTo ? new Date(dateTo) : null;
-          if (dateToEnd) dateToEnd.setHours(23, 59, 59, 999);
-          transactions = transactions.filter(t => {
-            const d = new Date(t.date);
-            if (dateFrom && d < dateFrom) return false;
-            if (dateToEnd && d > dateToEnd) return false;
-            return true;
-          });
-        }
-        if (own) {
-          transactions = transactions.filter(t => (t.ownAccount || '').trim() === own);
-        }
-        if (contra) {
-          transactions = transactions.filter(t => (t.contraAccountName || '').trim() === contra);
-        }
-        return { ownAccount: group.ownAccount, transactions };
-      }).filter(g => g.transactions.length > 0);
+    const filterFn = (transactions: TransactionLine[]) => {
+      let out = transactions;
+      if (this.hideCompleted()) {
+        out = out.filter(t => !completeIds.has(t.id));
+      }
+      if (contraContains) {
+        out = out.filter(t => (t.contraAccountName ?? '').toLowerCase().includes(contraContains));
+      }
+      if (dateFrom || dateTo) {
+        const dateToEnd = dateTo ? new Date(dateTo) : null;
+        if (dateToEnd) dateToEnd.setHours(23, 59, 59, 999);
+        out = out.filter(t => {
+          const d = new Date(t.date);
+          if (dateFrom && d < dateFrom) return false;
+          if (dateToEnd && d > dateToEnd) return false;
+          return true;
+        });
+      }
+      if (own) {
+        out = out.filter(t => (t.ownAccount || '').trim() === own);
+      }
+      return out;
+    };
+
+    if (contraContains || dateFrom || dateTo || own || this.hideCompleted()) {
+      list = list.map(group => ({
+        ownAccount: group.ownAccount,
+        transactions: filterFn(group.transactions),
+      })).filter(g => g.transactions.length > 0);
     }
     return list;
   });
 
-  private matchesSearch(t: TransactionLine, q: string): boolean {
-    for (const key of this.searchableKeys) {
-      const v = t[key];
-      if (v === undefined || v === null) continue;
-      const s = typeof v === 'number' ? String(v) : String(v);
-      if (s.toLowerCase().includes(q)) return true;
-    }
-    return false;
-  }
-
-  onSearchChange(): void {}
-  applyFilters(): void {}
-
   hasActiveFilters(): boolean {
-    return !!(this.filterDateFrom || this.filterDateTo || this.filterOwnAccount || this.filterContraName);
+    return !!(this.filterDateFrom() || this.filterDateTo() || this.filterOwnAccount() || this.filterContraNameContains().trim() || this.hideCompleted());
   }
 
   clearFilters(): void {
-    this.filterDateFrom = '';
-    this.filterDateTo = '';
-    this.filterOwnAccount = '';
-    this.filterContraName = '';
+    this.filterDateFrom.set('');
+    this.filterDateTo.set('');
+    this.filterOwnAccount.set('');
+    this.filterContraNameContains.set('');
+    this.hideCompleted.set(false);
   }
 
   /** Id of the row currently expanded for line items. */
@@ -527,18 +494,23 @@ export class TransactiesComponent implements OnInit {
     return this.lineItemsCache.get(rowId);
   }
 
-  /** Returns 'check_circle' or 'warning' when booking is loaded and has lines; null otherwise. */
-  getBalanceIcon(row: TransactionLine): 'check_circle' | 'warning' | null {
+  /** Returns 'check_circle' (Complete) or 'warning' (Needs review) when booking is loaded; null otherwise. Complete = in balance and all line items approved. */
+  getStatusIcon(row: TransactionLine): 'check_circle' | 'warning' | null {
     const state = this.getLineItemsState(row.id);
-    if (!state || state === 'loading' || !state.lines?.length) return null;
-    return this.bookingInBalance(state.lines) ? 'check_circle' : 'warning';
+    if (!state || state === 'loading') return null;
+    const lines = state.lines ?? [];
+    if (lines.length === 0) return 'warning';
+    if (!this.bookingInBalance(lines)) return 'warning';
+    const needsApproval = lines.filter(l => l.requiresReview).some(l => !l.reviewedAt);
+    return needsApproval ? 'warning' : 'check_circle';
   }
 
-  /** Returns 'schedule' (requires review) or 'verified' (reviewed) when booking is loaded and requiresReview; null otherwise. */
-  getReviewIcon(row: TransactionLine): 'schedule' | 'verified' | null {
-    const state = this.getLineItemsState(row.id);
-    if (!state || state === 'loading' || state.requiresReview === false) return null;
-    return state.reviewedAt ? 'verified' : 'schedule';
+  /** True when booking is complete: in balance and all line items approved. */
+  isBookingComplete(booking: BookingWithLinesDto): boolean {
+    const lines = booking.lines ?? [];
+    if (lines.length === 0) return false;
+    if (!this.bookingInBalance(lines)) return false;
+    return !lines.filter(l => l.requiresReview).some(l => !l.reviewedAt);
   }
 
   /** True when total debits equal total credits per currency (booking is in balance). */
@@ -602,15 +574,21 @@ export class TransactiesComponent implements OnInit {
     });
   }
 
-  markAsReviewed(row: TransactionLine, booking: BookingWithLinesDto): void {
-    this.bookingsService.markReviewed(booking.id).subscribe({
+  approveLine(row: TransactionLine, booking: BookingWithLinesDto, line: BookingLineDto): void {
+    this.bookingsService.approveLine(booking.id, line.id).subscribe({
       next: () => {
-        const updated = { ...booking, reviewedAt: new Date().toISOString() };
+        const updated = {
+          ...booking,
+          lines: booking.lines.map(l => l.id === line.id ? { ...l, reviewedAt: new Date().toISOString() } : l),
+        };
         this.lineItemsCache.set(row.id, updated);
+        if (this.isBookingComplete(updated)) {
+          this.completeSourceIds.update(ids => new Set(ids).add(row.id));
+        }
         this.cdr.markForCheck();
-        this.snackBar.open('Marked as reviewed', undefined, { duration: 2000 });
+        this.snackBar.open('Line approved', undefined, { duration: 2000 });
       },
-      error: (err) => this.snackBar.open(err?.error?.error ?? 'Failed to mark as reviewed', undefined, { duration: 4000 }),
+      error: (err) => this.snackBar.open(err?.error?.error ?? 'Failed to approve line', undefined, { duration: 4000 }),
     });
   }
 
@@ -653,9 +631,14 @@ export class TransactiesComponent implements OnInit {
       next: ({ lines, bookings }) => {
         this.groups.set(this.groupByOwnAccount(lines));
         this.lineItemsCache.clear();
+        const completeIds = new Set<string>();
         for (const b of bookings) {
-          if (b.sourceDocumentLineId) this.lineItemsCache.set(b.sourceDocumentLineId, b);
+          if (b.sourceDocumentLineId) {
+            this.lineItemsCache.set(b.sourceDocumentLineId, b);
+            if (this.isBookingComplete(b)) completeIds.add(b.sourceDocumentLineId);
+          }
         }
+        this.completeSourceIds.set(completeIds);
         this.loading = false;
         this.cdr.markForCheck();
       },

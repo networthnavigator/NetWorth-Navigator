@@ -77,14 +77,16 @@ public class BookingFromLineService
         if (!ownLedgerExists)
             throw new ArgumentException("OwnAccountLedgerId: LedgerAccount not found.");
 
-        int? contraLedgerAccountId = contraLedgerAccountIdOverride;
-        BusinessRule? appliedRule = null;
-        if (contraLedgerAccountId == null)
+        var matchingRules = new List<BusinessRule>();
+        if (contraLedgerAccountIdOverride.HasValue && contraLedgerAccountIdOverride.Value > 0)
         {
-            // Only contra rules (exclude OwnAccount rules which are for line 1). More specific rules first.
+            matchingRules.Add(new BusinessRule { LedgerAccountId = contraLedgerAccountIdOverride.Value, LineItemsJson = null, SecondLedgerAccountId = null });
+        }
+        else
+        {
             var rules = await _context.BusinessRules
                 .Include(r => r.LedgerAccount)
-                .Where(r => r.IsActive && r.MatchField.ToLower() != "ownaccount")
+                .Where(r => r.IsActive && (r.MatchField.ToLower() != "ownaccount" || !r.IsSystemGenerated))
                 .ToListAsync(ct);
             var contraOrdered = rules
                 .OrderByDescending(r => BusinessRuleCriteria.GetCriteria(r).Count)
@@ -94,30 +96,22 @@ public class BookingFromLineService
             foreach (var rule in contraOrdered)
             {
                 if (MatchesAll(line, rule))
-                {
-                    contraLedgerAccountId = rule.LedgerAccountId;
-                    appliedRule = rule;
-                    break;
-                }
+                    matchingRules.Add(rule);
             }
         }
 
-        if (contraLedgerAccountId != null)
+        foreach (var r in matchingRules)
         {
-            var contraLedgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == contraLedgerAccountId.Value, ct);
-            if (!contraLedgerExists)
-                throw new ArgumentException("ContraLedgerAccountId: LedgerAccount not found.");
-            if (appliedRule?.SecondLedgerAccountId != null)
-            {
-                var secondExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == appliedRule.SecondLedgerAccountId.Value, ct);
-                if (!secondExists)
-                    throw new ArgumentException("SecondLedgerAccountId: LedgerAccount not found.");
-            }
+            if (r.LedgerAccountId <= 0) continue;
+            var ledgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == r.LedgerAccountId, ct);
+            if (!ledgerExists)
+                throw new ArgumentException($"LedgerAccountId {r.LedgerAccountId} not found.");
         }
 
         var doc = document ?? line.Document;
         var reference = doc != null ? $"Import {doc.SourceName ?? "?"} line {line.LineNumber}" : $"Line {line.LineNumber}";
 
+        var requiresReview = matchingRules.Count > 0 ? matchingRules.Any(r => r.RequiresReview) : true;
         var booking = new Booking
         {
             Id = Guid.NewGuid(),
@@ -126,7 +120,7 @@ public class BookingFromLineService
             SourceDocumentLineId = line.Id,
             DateCreated = DateTime.UtcNow,
             CreatedByUser = "User",
-            RequiresReview = appliedRule != null ? appliedRule.RequiresReview : true,
+            RequiresReview = requiresReview,
         };
         _context.Bookings.Add(booking);
 
@@ -142,136 +136,121 @@ public class BookingFromLineService
             CreditAmount = line.Amount < 0 ? amount : 0,
             Currency = line.Currency,
             Description = line.Description,
+            RequiresReview = false,
+            ReviewedAt = DateTime.UtcNow,
         });
 
-        if (contraLedgerAccountId != null)
+        int lineNumber = 1;
+        var addedLedgerIds = new HashSet<int> { ownAccountLedgerId.Value };
+        foreach (var rule in matchingRules)
         {
-            if (appliedRule?.SecondLedgerAccountId != null)
+            var ruleLineItems = BusinessRuleLineItems.GetLineItems(rule);
+            foreach (var li in ruleLineItems)
             {
-                // Two contra lines with amount 0 (user fills in later, e.g. mortgage interest 4001 + principal 0773)
+                var ledgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == li.LedgerAccountId, ct);
+                if (!ledgerExists) continue;
+                if (addedLedgerIds.Contains(li.LedgerAccountId)) continue;
+                var debitAmount = li.AmountType == "Zero" ? 0m : (line.Amount < 0 ? amount : 0m);
+                var creditAmount = li.AmountType == "Zero" ? 0m : (line.Amount > 0 ? amount : 0m);
+                var lineRequiresReview = rule.RequiresReview;
                 _context.BookingLines.Add(new BookingLine
                 {
                     Id = Guid.NewGuid(),
                     BookingId = booking.Id,
-                    LineNumber = 1,
-                    LedgerAccountId = contraLedgerAccountId.Value,
-                    DebitAmount = 0,
-                    CreditAmount = 0,
+                    LineNumber = lineNumber++,
+                    LedgerAccountId = li.LedgerAccountId,
+                    DebitAmount = debitAmount,
+                    CreditAmount = creditAmount,
                     Currency = line.Currency,
                     Description = line.ContraAccountName ?? line.Description,
+                    RequiresReview = lineRequiresReview,
+                    ReviewedAt = lineRequiresReview ? null : DateTime.UtcNow,
+                    BusinessRuleId = rule.Id > 0 ? rule.Id : null,
                 });
-                _context.BookingLines.Add(new BookingLine
-                {
-                    Id = Guid.NewGuid(),
-                    BookingId = booking.Id,
-                    LineNumber = 2,
-                    LedgerAccountId = appliedRule.SecondLedgerAccountId.Value,
-                    DebitAmount = 0,
-                    CreditAmount = 0,
-                    Currency = line.Currency,
-                    Description = line.ContraAccountName ?? line.Description,
-                });
-            }
-            else
-            {
-                _context.BookingLines.Add(new BookingLine
-                {
-                    Id = Guid.NewGuid(),
-                    BookingId = booking.Id,
-                    LineNumber = 1,
-                    LedgerAccountId = contraLedgerAccountId.Value,
-                    DebitAmount = line.Amount < 0 ? amount : 0,
-                    CreditAmount = line.Amount > 0 ? amount : 0,
-                    Currency = line.Currency,
-                    Description = line.ContraAccountName ?? line.ContraAccount,
-                });
+                addedLedgerIds.Add(li.LedgerAccountId);
             }
         }
 
-        return (booking, contraLedgerAccountId != null);
+        return (booking, matchingRules.Count > 0);
     }
 
-    /// <summary>Adds contra line(s) from the first matching business rule to an existing booking. Does not remove any existing lines. Caller must SaveChanges.</summary>
-    /// <returns>True if one or more lines were added.</returns>
+    /// <summary>Adds or replaces contra line(s) from all matching business rules. Lines created by a rule are replaced when that rule matches again. Caller must SaveChanges.</summary>
+    /// <returns>True if one or more lines were added or replaced.</returns>
     public async Task<bool> AddRuleLinesToExistingBookingAsync(Booking booking, TransactionDocumentLine line, CancellationToken ct = default)
     {
-        var lines = booking.Lines ?? new List<BookingLine>();
-        int nextLineNumber = lines.Count > 0 ? lines.Max(l => l.LineNumber) + 1 : 0;
+        var lines = (booking.Lines ?? new List<BookingLine>()).ToList();
 
         var rules = await _context.BusinessRules
             .Include(r => r.LedgerAccount)
-            .Where(r => r.IsActive && r.MatchField.ToLower() != "ownaccount")
+            .Where(r => r.IsActive && (r.MatchField.ToLower() != "ownaccount" || !r.IsSystemGenerated))
             .ToListAsync(ct);
         var contraOrdered = rules
             .OrderByDescending(r => BusinessRuleCriteria.GetCriteria(r).Count)
             .ThenBy(r => r.SortOrder)
             .ThenBy(r => r.Id)
             .ToList();
-        BusinessRule? appliedRule = null;
-        int? contraLedgerAccountId = null;
-        foreach (var rule in contraOrdered)
-        {
-            if (MatchesAll(line, rule))
-            {
-                contraLedgerAccountId = rule.LedgerAccountId;
-                appliedRule = rule;
-                break;
-            }
-        }
-        if (contraLedgerAccountId == null)
+        var matchingRules = contraOrdered.Where(r => MatchesAll(line, r)).ToList();
+        if (matchingRules.Count == 0)
             return false;
-
-        var contraLedgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == contraLedgerAccountId.Value, ct);
-        if (!contraLedgerExists)
-            return false;
-        if (appliedRule?.SecondLedgerAccountId != null)
-        {
-            var secondExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == appliedRule.SecondLedgerAccountId.Value, ct);
-            if (!secondExists)
-                return false;
-        }
 
         var amount = Math.Abs(line.Amount);
-        if (appliedRule?.SecondLedgerAccountId != null)
+        var changed = false;
+
+        foreach (var rule in matchingRules)
         {
-            _context.BookingLines.Add(new BookingLine
+            var existingFromRule = lines.Where(l => l.BusinessRuleId == rule.Id).ToList();
+            foreach (var old in existingFromRule)
             {
-                Id = Guid.NewGuid(),
-                BookingId = booking.Id,
-                LineNumber = nextLineNumber++,
-                LedgerAccountId = contraLedgerAccountId.Value,
-                DebitAmount = 0,
-                CreditAmount = 0,
-                Currency = line.Currency,
-                Description = line.ContraAccountName ?? line.Description,
-            });
-            _context.BookingLines.Add(new BookingLine
+                _context.BookingLines.Remove(old);
+                lines.Remove(old);
+                changed = true;
+            }
+
+            var ruleLineItems = BusinessRuleLineItems.GetLineItems(rule);
+            var nextLineNumber = lines.Count > 0 ? lines.Max(l => l.LineNumber) + 1 : 0;
+            var existingLedgerIds = lines.Select(l => l.LedgerAccountId).ToHashSet();
+            foreach (var li in ruleLineItems)
             {
-                Id = Guid.NewGuid(),
-                BookingId = booking.Id,
-                LineNumber = nextLineNumber,
-                LedgerAccountId = appliedRule.SecondLedgerAccountId.Value,
-                DebitAmount = 0,
-                CreditAmount = 0,
-                Currency = line.Currency,
-                Description = line.ContraAccountName ?? line.Description,
-            });
+                var ledgerExists = await _context.LedgerAccounts.AnyAsync(a => a.Id == li.LedgerAccountId, ct);
+                if (!ledgerExists) continue;
+                if (existingLedgerIds.Contains(li.LedgerAccountId)) continue;
+                var debitAmount = li.AmountType == "Zero" ? 0m : (line.Amount < 0 ? amount : 0m);
+                var creditAmount = li.AmountType == "Zero" ? 0m : (line.Amount > 0 ? amount : 0m);
+                var lineRequiresReview = rule.RequiresReview;
+                var newLine = new BookingLine
+                {
+                    Id = Guid.NewGuid(),
+                    BookingId = booking.Id,
+                    LineNumber = nextLineNumber++,
+                    LedgerAccountId = li.LedgerAccountId,
+                    DebitAmount = debitAmount,
+                    CreditAmount = creditAmount,
+                    Currency = line.Currency,
+                    Description = line.ContraAccountName ?? line.ContraAccount,
+                    RequiresReview = lineRequiresReview,
+                    ReviewedAt = lineRequiresReview ? null : DateTime.UtcNow,
+                    BusinessRuleId = rule.Id,
+                };
+                _context.BookingLines.Add(newLine);
+                lines.Add(newLine);
+                existingLedgerIds.Add(li.LedgerAccountId);
+                changed = true;
+            }
         }
-        else
+
+        if (changed)
         {
-            _context.BookingLines.Add(new BookingLine
+            var ordered = lines.OrderBy(l => l.LineNumber).ToList();
+            for (var i = 0; i < ordered.Count; i++)
             {
-                Id = Guid.NewGuid(),
-                BookingId = booking.Id,
-                LineNumber = nextLineNumber,
-                LedgerAccountId = contraLedgerAccountId.Value,
-                DebitAmount = line.Amount < 0 ? amount : 0,
-                CreditAmount = line.Amount > 0 ? amount : 0,
-                Currency = line.Currency,
-                Description = line.ContraAccountName ?? line.ContraAccount,
-            });
+                if (ordered[i].LineNumber != i)
+                {
+                    ordered[i].LineNumber = i;
+                }
+            }
         }
-        return true;
+
+        return changed;
     }
 
     /// <summary>Returns true if the transaction line matches all criteria of the rule. Used to list bookings that match a rule.</summary>

@@ -130,7 +130,20 @@ using (var scope = app.Services.CreateScope())
                 DebitAmount REAL NOT NULL DEFAULT 0,
                 CreditAmount REAL NOT NULL DEFAULT 0,
                 Currency TEXT NOT NULL DEFAULT 'EUR',
-                Description TEXT)");
+                Description TEXT,
+                RequiresReview INTEGER NOT NULL DEFAULT 0,
+                ReviewedAt TEXT,
+                BusinessRuleId INTEGER NULL)");
+    }
+    // Migrate existing BookingLines: add RequiresReview and ReviewedAt if missing
+    if (hasBookingLines)
+    {
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BookingLines') WHERE name='RequiresReview'").OrderBy(x => x).FirstOrDefault() == 0)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BookingLines ADD COLUMN RequiresReview INTEGER NOT NULL DEFAULT 0");
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BookingLines') WHERE name='ReviewedAt'").OrderBy(x => x).FirstOrDefault() == 0)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BookingLines ADD COLUMN ReviewedAt TEXT");
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BookingLines') WHERE name='BusinessRuleId'").OrderBy(x => x).FirstOrDefault() == 0)
+            db.Database.ExecuteSqlRaw("ALTER TABLE BookingLines ADD COLUMN BusinessRuleId INTEGER NULL");
     }
     var hasBusinessRules = db.Database.SqlQueryRaw<int>(
         "SELECT COUNT(*) as Value FROM sqlite_master WHERE type='table' AND name='BusinessRules'").OrderBy(x => x).FirstOrDefault() > 0;
@@ -146,26 +159,30 @@ using (var scope = app.Services.CreateScope())
                 CriteriaJson TEXT NULL,
                 LedgerAccountId INTEGER NOT NULL REFERENCES LedgerAccounts(Id),
                 SecondLedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id),
+                LineItemsJson TEXT NULL,
                 SortOrder INTEGER NOT NULL DEFAULT 0,
                 IsActive INTEGER NOT NULL DEFAULT 1,
                 RequiresReview INTEGER NOT NULL DEFAULT 1)");
     }
     // Migrate existing BusinessRules: add RequiresReview if missing
-    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='RequiresReview'").FirstOrDefault() == 0)
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='RequiresReview'").OrderBy(x => x).FirstOrDefault() == 0)
         db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN RequiresReview INTEGER NOT NULL DEFAULT 1");
     // Migrate existing BusinessRules: add SecondLedgerAccountId if missing
-    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='SecondLedgerAccountId'").FirstOrDefault() == 0)
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='SecondLedgerAccountId'").OrderBy(x => x).FirstOrDefault() == 0)
         db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN SecondLedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id)");
     // Migrate existing BusinessRules: add CriteriaJson for multiple criteria per rule
-    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='CriteriaJson'").FirstOrDefault() == 0)
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='CriteriaJson'").OrderBy(x => x).FirstOrDefault() == 0)
         db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN CriteriaJson TEXT NULL");
+    // Migrate existing BusinessRules: add LineItemsJson for multiple line items per rule
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='LineItemsJson'").OrderBy(x => x).FirstOrDefault() == 0)
+        db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN LineItemsJson TEXT NULL");
 
     // Migrate existing Bookings: add RequiresReview and ReviewedAt if missing
     if (hasBookings)
     {
-        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('Bookings') WHERE name='RequiresReview'").FirstOrDefault() == 0)
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('Bookings') WHERE name='RequiresReview'").OrderBy(x => x).FirstOrDefault() == 0)
             db.Database.ExecuteSqlRaw("ALTER TABLE Bookings ADD COLUMN RequiresReview INTEGER NOT NULL DEFAULT 1");
-        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('Bookings') WHERE name='ReviewedAt'").FirstOrDefault() == 0)
+        if (db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('Bookings') WHERE name='ReviewedAt'").OrderBy(x => x).FirstOrDefault() == 0)
             db.Database.ExecuteSqlRaw("ALTER TABLE Bookings ADD COLUMN ReviewedAt TEXT");
     }
 
@@ -242,7 +259,7 @@ using (var scope = app.Services.CreateScope())
     }
     else
     {
-        var hasInvLedger = db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('InvestmentAccounts') WHERE name='LedgerAccountId'").FirstOrDefault();
+        var hasInvLedger = db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('InvestmentAccounts') WHERE name='LedgerAccountId'").OrderBy(x => x).FirstOrDefault();
         if (hasInvLedger == 0)
             db.Database.ExecuteSqlRaw("ALTER TABLE InvestmentAccounts ADD COLUMN LedgerAccountId INTEGER NULL REFERENCES LedgerAccounts(Id)");
     }
@@ -367,14 +384,8 @@ using (var scope = app.Services.CreateScope())
     }
 
     // Ensure IsSystemGenerated column exists (for existing DBs created before this property was added)
-    try
-    {
-        await db.Database.ExecuteSqlRawAsync("ALTER TABLE BusinessRules ADD COLUMN IsSystemGenerated INTEGER NOT NULL DEFAULT 0");
-    }
-    catch
-    {
-        /* Column already exists or table not yet created */
-    }
+    if (hasBusinessRules && db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM pragma_table_info('BusinessRules') WHERE name='IsSystemGenerated'").OrderBy(x => x).FirstOrDefault() == 0)
+        db.Database.ExecuteSqlRaw("ALTER TABLE BusinessRules ADD COLUMN IsSystemGenerated INTEGER NOT NULL DEFAULT 0");
 
     // Remove redundant "Own account (by number)" rules so we only have one rule per ledger (match by name; number is resolved via BalanceSheetAccount lookup)
     var byNumberRules = await db.BusinessRules.Where(r => r.MatchField == "OwnAccount" && r.Name != null && r.Name.EndsWith(" (by number)")).ToListAsync();
@@ -413,7 +424,7 @@ using (var scope = app.Services.CreateScope())
     await db.BusinessRules.Where(r => r.MatchField == "OwnAccount").ExecuteUpdateAsync(s => s.SetProperty(r => r.IsSystemGenerated, true));
 
     // One-time: delete all booking rules (user-created and Own-account automatic); remove the next line after the next run if you only want this once
-    await db.BusinessRules.ExecuteDeleteAsync();
+    // await db.BusinessRules.ExecuteDeleteAsync();
 }
 
 app.UseSwagger();

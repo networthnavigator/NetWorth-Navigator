@@ -5,12 +5,7 @@
       "name": "NetWorth Navigator"
     },
     {
-      "path": "src/NetWorthNavigator.Backend",
-      "name": "Backend"
-    },
-    {
-      "path": "src/NetWorthNavigator.Frontend",
-      "name": "Frontend"
+      "path": "../NetWorth-Navigator-images"
     }
   ],
   "settings": {}

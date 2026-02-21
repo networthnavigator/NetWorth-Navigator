@@ -56,19 +56,23 @@ export interface UploadReportDialogData {
         </div>
       }
 
+      @if (refreshingPreview()) {
+        <p class="refreshing"><mat-spinner diameter="24"></mat-spinner> Refreshing preview…</p>
+      }
+
       <div class="summary-cards">
         <div class="summary-card ready">
-          <span class="summary-value">{{ data.preview.readyForImport }}</span>
+          <span class="summary-value">{{ preview().readyForImport }}</span>
           <span class="summary-label">Documents ready for import</span>
         </div>
         <div class="summary-card skip">
-          <span class="summary-value">{{ data.preview.toSkip }}</span>
+          <span class="summary-value">{{ preview().toSkip }}</span>
           <span class="summary-label">Documents to skip</span>
         </div>
       </div>
 
       <div class="table-wrap">
-        <table mat-table [dataSource]="data.preview.lines" class="report-table">
+        <table mat-table [dataSource]="preview().lines" class="report-table">
           <ng-container matColumnDef="date">
             <th mat-header-cell *matHeaderCellDef>Date</th>
             <td mat-cell *matCellDef="let row">{{ row.date ?? '—' }}</td>
@@ -135,7 +139,7 @@ export interface UploadReportDialogData {
     }
     .action-badge.import { background: rgba(46, 125, 50, 0.12); color: #2e7d32; }
     .action-badge.skip { background: rgba(237, 108, 2, 0.12); color: #ed6c02; }
-    .importing { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; }
+    .importing, .refreshing { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; }
     .accounts-required {
       margin-bottom: 20px; padding: 16px; background: rgba(237, 108, 2, 0.08); border: 1px solid rgba(237, 108, 2, 0.3); border-radius: 8px;
     }
@@ -154,23 +158,27 @@ export class UploadReportDialogComponent implements OnInit {
   readonly data = inject<UploadReportDialogData>(MAT_DIALOG_DATA);
 
   readonly importing = signal(false);
+  readonly refreshingPreview = signal(false);
+  readonly preview = signal<PreviewResult>({ readyForImport: 0, toSkip: 0, lines: [], ownAccountsInFile: [] });
   readonly missingAccounts = signal<string[]>([]);
   readonly unlinkedAccounts = signal<string[]>([]);
 
   displayedColumns = ['date', 'name', 'amount', 'action'];
 
   canImport(): boolean {
-    return this.data.preview.readyForImport > 0 &&
+    const p = this.preview();
+    return p.readyForImport > 0 &&
       this.missingAccounts().length === 0 &&
       this.unlinkedAccounts().length === 0;
   }
 
   ngOnInit(): void {
+    this.preview.set(this.data.preview);
     this.refreshAccountCheck();
   }
 
-  refreshAccountCheck(): void {
-    const inFile = this.data.preview.ownAccountsInFile ?? [];
+  refreshAccountCheck(afterAddingAccounts = false): void {
+    const inFile = this.preview().ownAccountsInFile ?? [];
     if (inFile.length === 0) {
       this.missingAccounts.set([]);
       this.unlinkedAccounts.set([]);
@@ -205,10 +213,28 @@ export class UploadReportDialogComponent implements OnInit {
         });
         this.missingAccounts.set(missing);
         this.unlinkedAccounts.set(unlinked);
+        // After adding accounts, re-run preview to update line actions (was "Account not tracked")
+        if (afterAddingAccounts && missing.length === 0 && unlinked.length === 0) {
+          this.refreshPreview();
+        }
       },
       error: () => {
-        this.missingAccounts.set(this.data.preview.ownAccountsInFile ?? []);
+        this.missingAccounts.set(this.preview().ownAccountsInFile ?? []);
         this.unlinkedAccounts.set([]);
+      },
+    });
+  }
+
+  private refreshPreview(): void {
+    this.refreshingPreview.set(true);
+    this.uploadService.preview(this.data.file, this.data.configurationId).subscribe({
+      next: (p) => {
+        this.preview.set(p);
+        this.refreshingPreview.set(false);
+      },
+      error: () => {
+        this.refreshingPreview.set(false);
+        this.snackBar.open('Could not refresh preview', undefined, { duration: 3000 });
       },
     });
   }
@@ -221,7 +247,7 @@ export class UploadReportDialogComponent implements OnInit {
       maxWidth: '95vw',
       data: { unknownAccounts: unknown },
     }).afterClosed().subscribe((added) => {
-      if (added) this.refreshAccountCheck();
+      if (added) this.refreshAccountCheck(true);
     });
   }
 

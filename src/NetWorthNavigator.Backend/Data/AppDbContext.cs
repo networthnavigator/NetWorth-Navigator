@@ -79,6 +79,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.CreditAmount).HasPrecision(18, 2);
             entity.Property(e => e.Currency).HasMaxLength(3);
             entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.RequiresReview).HasConversion<int>();
         });
         modelBuilder.Entity<BusinessRule>(entity =>
         {

@@ -39,13 +39,13 @@ docker save "$FRONTEND_IMAGE" -o "$FRONTEND_TAR"
 echo "Saved: $(basename "$BACKEND_TAR")"
 echo "Saved: $(basename "$FRONTEND_TAR")"
 
-# Archive old docker-compose.yml if it exists (before creating new one)
-COMPOSE_FILE="${OUTPUT_DIR}/docker-compose.yml"
+# Archive old networth-navigator.yml if it exists (before creating new one)
+COMPOSE_FILE="${OUTPUT_DIR}/networth-navigator.yml"
 if [ -f "$COMPOSE_FILE" ]; then
-  mv "$COMPOSE_FILE" "${ARCHIVE_DIR}/docker-compose-$(date +"%Y%m%d.%H%M%S").yml" 2>/dev/null || true
+  mv "$COMPOSE_FILE" "${ARCHIVE_DIR}/networth-navigator-$(date +"%Y%m%d.%H%M%S").yml" 2>/dev/null || true
 fi
 
-# Create deployment docker-compose.yml
+# Create deployment networth-navigator.yml
 cat > "$COMPOSE_FILE" <<EOF
 services:
   backend:
@@ -71,7 +71,7 @@ volumes:
   backend-data:
 EOF
 
-echo "Created: docker-compose.yml"
+echo "Created: networth-navigator.yml"
 echo ""
 
 # Archive old versions (keep only the latest in main directory)
@@ -88,6 +88,6 @@ echo "To load and run locally:"
 echo "  cd ${OUTPUT_DIR}"
 echo "  docker load -i $(basename "$BACKEND_TAR")"
 echo "  docker load -i $(basename "$FRONTEND_TAR")"
-echo "  docker compose up -d"
+echo "  docker compose -f networth-navigator.yml up -d"
 echo ""
 echo "Old versions archived to: ${ARCHIVE_DIR}"

@@ -30,7 +30,7 @@ const FALLBACK_DB_SCHEMA: { id: string; label: string }[] = [
   { id: 'ExternalId', label: 'External ID (bank transaction ID, for deduplication)' },
   { id: 'Amount', label: 'Amount' },
   { id: '_AmountSign', label: 'Debit/Credit' },
-  { id: 'Description', label: 'Description (e.g. Mededelingen)' },
+  { id: 'Description', label: 'Description' },
   { id: 'BalanceAfter', label: 'Balance after' },
   { id: 'Currency', label: 'Currency' },
   { id: 'MovementType', label: 'Movement type (code)' },

@@ -14,10 +14,6 @@ import {
   PreviewResult,
 } from '../models/upload-config.model';
 import {
-  UploadConfigDialogComponent,
-  UploadConfigDialogData,
-} from './upload-config-dialog.component';
-import {
   UploadConfigWizardComponent,
   UploadConfigWizardInput,
 } from './upload-config-wizard.component';
@@ -73,8 +69,7 @@ function getDefaultBanks(): AddBankResult[] {
       </div>
     </div>
     <p class="instruction">
-      Select a bank and then the file type you want to add.
-      Or add the file directly and let the system determine which configuration matches.
+      Select a bank and file type, then upload your CSV. To add a new file type, upload the file below—the wizard will guide you through creating the configuration.
     </p>
 
     <div class="top-blocks">
@@ -111,19 +106,11 @@ function getDefaultBanks(): AddBankResult[] {
         <mat-card-content>
           @if (selectedBank()) {
             @if (configurations().length === 0 && !loadingConfigs()) {
-              <p class="empty">No configurations known for {{ selectedBank()!.name }}.</p>
-              <button type="button" class="add-config-btn" (click)="openNewConfigDialog()">
-                <span class="material-symbols-outlined">add</span>
-                New configuration
-              </button>
+              <p class="empty">No file types configured for {{ selectedBank()!.name }}. Upload a file below to create one—the wizard will guide you.</p>
             } @else if (loadingConfigs()) {
               <mat-spinner diameter="24"></mat-spinner>
           } @else {
             <div class="config-list">
-              <button type="button" class="add-config-btn" (click)="openNewConfigDialog()">
-                <span class="material-symbols-outlined">add</span>
-                New configuration
-              </button>
                 @for (cfg of configurations(); track cfg.id) {
                   <div
                     class="config-tile"
@@ -155,6 +142,12 @@ function getDefaultBanks(): AddBankResult[] {
         <mat-card-title>Upload file</mat-card-title>
       </mat-card-header>
       <mat-card-content>
+          @if (selectedBank() && configurations().length === 0 && !loadingConfigs()) {
+            <p class="upload-hint">
+              <span class="material-symbols-outlined">lightbulb</span>
+              Upload a file here to create a new file type configuration. The wizard will guide you through the process.
+            </p>
+          }
           <div class="drop-section">
             <div
               class="drop-zone"
@@ -375,6 +368,22 @@ function getDefaultBanks(): AddBankResult[] {
     .config-desc { font-size: 0.85em; color: #666; }
     html.theme-dark .config-desc { color: rgba(255,255,255,0.6); }
     .empty { color: #888; font-style: italic; }
+    .upload-hint {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      background: rgba(25, 118, 210, 0.08);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: #1565c0;
+    }
+    .upload-hint .material-symbols-outlined { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+    html.theme-dark .upload-hint {
+      background: rgba(25, 118, 210, 0.15);
+      color: #90caf9;
+    }
     .add-config-btn {
       display: flex;
       align-items: center;
@@ -660,25 +669,6 @@ export class UploadComponent implements OnInit {
         this.detecting.set(false);
         this.snackBar.open('Could not analyse file', undefined, { duration: 3000 });
       },
-    });
-  }
-
-  openNewConfigDialog() {
-    const bank = this.selectedBank();
-    if (!bank) return;
-    const data: UploadConfigDialogData = {
-      bank,
-      banks: this.banksForConfigDialog(),
-    };
-    const ref = this.dialog.open(UploadConfigDialogComponent, {
-      data,
-      width: '520px',
-    });
-    ref.afterClosed().subscribe((created?: UploadConfiguration) => {
-      if (created) {
-        this.configurations.update(c => [...c, created]);
-        this.selectedConfig.set(created);
-      }
     });
   }
 

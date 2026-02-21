@@ -17,4 +17,10 @@ public class BookingLine
     public decimal CreditAmount { get; set; }
     public string Currency { get; set; } = "EUR";
     public string? Description { get; set; }
+    /// <summary>When true, this line must be approved by the user. Line 1 (own account) is always false.</summary>
+    public bool RequiresReview { get; set; }
+    /// <summary>When set, the line has been approved by the user.</summary>
+    public DateTime? ReviewedAt { get; set; }
+    /// <summary>When set, this line was created by the given business rule. Null for own-account (line 1) and manually added lines.</summary>
+    public int? BusinessRuleId { get; set; }
 }

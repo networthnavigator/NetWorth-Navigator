@@ -51,6 +51,8 @@ public class BookingsController : ControllerBase
                 CreditAmount = l.CreditAmount,
                 Currency = l.Currency,
                 Description = l.Description,
+                RequiresReview = l.RequiresReview,
+                ReviewedAt = l.ReviewedAt,
             }).ToList(),
         }).ToList();
 
@@ -89,27 +91,25 @@ public class BookingsController : ControllerBase
                 CreditAmount = l.CreditAmount,
                 Currency = l.Currency,
                 Description = l.Description,
+                RequiresReview = l.RequiresReview,
+                ReviewedAt = l.ReviewedAt,
             }).ToList(),
         };
         return Ok(dto);
     }
 
-    /// <summary>PUT /api/bookings/{id}/reviewed - Mark a booking as reviewed/approved by the user. Fails if the booking is not in balance (debits ≠ credits).</summary>
-    [HttpPut("{id:guid}/reviewed")]
-    public async Task<IActionResult> MarkReviewed(Guid id, CancellationToken ct = default)
+    /// <summary>PUT /api/bookings/{id}/lines/{lineId}/reviewed - Mark a line item as approved by the user.</summary>
+    [HttpPut("{id:guid}/lines/{lineId:guid}/reviewed")]
+    public async Task<IActionResult> MarkLineReviewed(Guid id, Guid lineId, CancellationToken ct = default)
     {
-        var booking = await _context.Bookings.Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == id, ct);
-        if (booking == null)
-            return NotFound(new { error = "Booking not found" });
-        var lines = booking.Lines ?? new List<BookingLine>();
-        foreach (var group in lines.GroupBy(l => l.Currency ?? "EUR"))
-        {
-            var totalDebit = group.Sum(l => l.DebitAmount);
-            var totalCredit = group.Sum(l => l.CreditAmount);
-            if (Math.Abs(totalDebit - totalCredit) > 0.001m)
-                return BadRequest(new { error = "Booking is not in balance (debits must equal credits). Add or adjust lines so that total debits equal total credits per currency." });
-        }
-        booking.ReviewedAt = DateTime.UtcNow;
+        var line = await _context.BookingLines
+            .Include(l => l.Booking)
+            .FirstOrDefaultAsync(l => l.Id == lineId && l.BookingId == id, ct);
+        if (line == null)
+            return NotFound(new { error = "Line not found" });
+        if (!line.RequiresReview)
+            return BadRequest(new { error = "This line does not require approval" });
+        line.ReviewedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
         return NoContent();
     }
@@ -161,12 +161,23 @@ public class BookingsController : ControllerBase
         else if (scope.Equals("PendingOnly", StringComparison.OrdinalIgnoreCase))
         {
             var allLineIds = await _context.TransactionDocumentLines.Select(l => l.Id).ToListAsync(ct);
-            var reviewedSourceIds = await _context.Bookings
-                .Where(b => b.SourceDocumentLineId != null && b.ReviewedAt != null)
+            var bookings = await _context.Bookings
+                .Include(b => b.Lines)
+                .Where(b => b.SourceDocumentLineId != null)
+                .ToListAsync(ct);
+            var completeSourceIds = bookings
+                .Where(b =>
+                {
+                    var lines = b.Lines?.ToList() ?? new List<BookingLine>();
+                    if (lines.Count == 0) return false;
+                    var inBalance = lines.GroupBy(l => l.Currency ?? "EUR").All(g => Math.Abs(g.Sum(l => l.DebitAmount) - g.Sum(l => l.CreditAmount)) < 0.001m);
+                    var allApproved = lines.Where(l => l.RequiresReview).All(l => l.ReviewedAt != null);
+                    return inBalance && allApproved;
+                })
                 .Select(b => b.SourceDocumentLineId!.Value)
                 .Distinct()
-                .ToListAsync(ct);
-            lineIdsToProcess = allLineIds.Where(id => !reviewedSourceIds.Contains(id)).ToList();
+                .ToList();
+            lineIdsToProcess = allLineIds.Where(id => !completeSourceIds.Contains(id)).ToList();
         }
         else if (scope.Equals("All", StringComparison.OrdinalIgnoreCase))
         {
@@ -240,6 +251,8 @@ public class BookingsController : ControllerBase
             CreditAmount = request.CreditAmount,
             Currency = request.Currency ?? "EUR",
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            RequiresReview = true,
+            ReviewedAt = null,
         };
         _context.BookingLines.Add(line);
         await _context.SaveChangesAsync(ct);
@@ -256,6 +269,8 @@ public class BookingsController : ControllerBase
             CreditAmount = line.CreditAmount,
             Currency = line.Currency,
             Description = line.Description,
+            RequiresReview = line.RequiresReview,
+            ReviewedAt = line.ReviewedAt,
         };
         return Ok(dto);
     }
@@ -317,4 +332,6 @@ public class BookingLineDto
     public decimal CreditAmount { get; set; }
     public string Currency { get; set; } = "EUR";
     public string? Description { get; set; }
+    public bool RequiresReview { get; set; }
+    public DateTime? ReviewedAt { get; set; }
 }

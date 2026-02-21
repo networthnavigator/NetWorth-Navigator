@@ -21,7 +21,7 @@ export class BookingRulesService {
       name: rule.name,
       ledgerAccountId: rule.ledgerAccountId!,
       secondLedgerAccountId: rule.secondLedgerAccountId ?? undefined,
-      sortOrder: rule.sortOrder ?? 0,
+      lineItems: rule.lineItems ?? undefined,
       requiresReview: rule.requiresReview !== false,
     };
     const criteria = rule['criteria'];
@@ -44,7 +44,7 @@ export class BookingRulesService {
       name: rule.name,
       ledgerAccountId: rule.ledgerAccountId,
       secondLedgerAccountId: rule.secondLedgerAccountId ?? null,
-      sortOrder: rule.sortOrder,
+      lineItems: rule.lineItems ?? undefined,
       isActive: rule.isActive,
       requiresReview: rule.requiresReview,
     };

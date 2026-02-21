@@ -12,7 +12,7 @@ public class BookingRulesSeedService
 
     public BookingRulesSeedService(AppDbContext context) => _context = context;
 
-    /// <summary>Imports rules from JSON. Skips a rule if one already exists with same MatchField, MatchValue and LedgerAccountId. Only adds when LedgerAccountId exists.</summary>
+    /// <summary>Imports user rules from JSON. Skips system rules (MatchField=OwnAccount). Skips a rule if one already exists with same MatchField, MatchValue and LedgerAccountId. Only adds when LedgerAccountId exists.</summary>
     public async Task<BookingRulesSeedResult> ImportFromJsonAsync(string json, CancellationToken ct = default)
     {
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -24,9 +24,11 @@ public class BookingRulesSeedService
         var existingLedgerIds = await _context.LedgerAccounts.Select(a => a.Id).ToHashSetAsync(ct);
         foreach (var item in items)
         {
+            var matchField = (item.MatchField ?? "ContraAccountName").Trim();
+            if (string.Equals(matchField, "OwnAccount", StringComparison.OrdinalIgnoreCase))
+                continue;
             if (item.LedgerAccountId <= 0 || !existingLedgerIds.Contains(item.LedgerAccountId))
                 continue;
-            var matchField = (item.MatchField ?? "ContraAccountName").Trim();
             var matchValue = (item.MatchValue ?? "").Trim();
             var exists = await _context.BusinessRules
                 .AnyAsync(r => r.MatchField == matchField && r.MatchValue == matchValue && r.LedgerAccountId == item.LedgerAccountId, ct);
@@ -55,12 +57,13 @@ public class BookingRulesSeedService
         return new BookingRulesSeedResult { RulesAdded = added };
     }
 
-    /// <summary>Exports current booking rules to JSON (for seed file).</summary>
+    /// <summary>Exports current user-editable booking rules to JSON (for seed file). System-generated rules (e.g. OwnAccount) are excluded.</summary>
     public async Task<string> ExportToJsonAsync(CancellationToken ct = default)
     {
         var list = await _context.BusinessRules
             .Include(r => r.LedgerAccount)
             .Include(r => r.SecondLedgerAccount)
+            .Where(r => !r.IsSystemGenerated)
             .OrderBy(r => r.SortOrder)
             .ThenBy(r => r.Id)
             .Select(r => new BookingRuleSeedItem

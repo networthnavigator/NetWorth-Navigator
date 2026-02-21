@@ -76,18 +76,11 @@ import { getCurrencySymbol } from '../models/preferences.model';
                   } @else {
                     {{ matchFieldLabel(r.matchField) }} {{ matchOperatorLabel(r.matchOperator) }} "{{ r.matchValue }}"
                   }
-                  @if (hasConflicts(r)) {
-                    <span class="material-symbols-outlined conflict-icon" [matTooltip]="getConflictTooltip(r)">warning</span>
-                  }
                 </td>
               </ng-container>
               <ng-container matColumnDef="ledger">
                 <th mat-header-cell *matHeaderCellDef>Ledger</th>
                 <td mat-cell *matCellDef="let r">{{ (r.ledgerAccountCode ?? '') || r.ledgerAccountName || r.ledgerAccountId }}{{ r.secondLedgerAccountId ? ' + ' + (r.secondLedgerAccountCode ?? r.secondLedgerAccountName ?? r.secondLedgerAccountId) : '' }}</td>
-              </ng-container>
-              <ng-container matColumnDef="sortOrder">
-                <th mat-header-cell *matHeaderCellDef>Order</th>
-                <td mat-cell *matCellDef="let r">{{ r.sortOrder }}</td>
               </ng-container>
               <ng-container matColumnDef="requiresReview">
                 <th mat-header-cell *matHeaderCellDef>Requires review</th>
@@ -125,18 +118,6 @@ import { getCurrencySymbol } from '../models/preferences.model';
                             <p class="matching-empty">No bookings match this rule yet.</p>
                           } @else {
                             <table mat-table [dataSource]="list" class="inner-table">
-                              <ng-container matColumnDef="review">
-                                <th mat-header-cell *matHeaderCellDef class="review-col"></th>
-                                <td mat-cell *matCellDef="let b">
-                                  @if (b.requiresReview !== false) {
-                                    @if (b.reviewedAt) {
-                                      <span class="material-symbols-outlined review-done" matTooltip="Reviewed">verified</span>
-                                    } @else {
-                                      <span class="material-symbols-outlined review-pending" matTooltip="Requires review">schedule</span>
-                                    }
-                                  }
-                                </td>
-                              </ng-container>
                               <ng-container matColumnDef="date">
                                 <th mat-header-cell *matHeaderCellDef>Date</th>
                                 <td mat-cell *matCellDef="let b">{{ formatDate(b.date) }}</td>
@@ -229,18 +210,6 @@ import { getCurrencySymbol } from '../models/preferences.model';
                             <p class="matching-empty">No bookings match this rule yet.</p>
                           } @else {
                             <table mat-table [dataSource]="list" class="inner-table">
-                              <ng-container matColumnDef="review">
-                                <th mat-header-cell *matHeaderCellDef class="review-col"></th>
-                                <td mat-cell *matCellDef="let b">
-                                  @if (b.requiresReview !== false) {
-                                    @if (b.reviewedAt) {
-                                      <span class="material-symbols-outlined review-done" matTooltip="Reviewed">verified</span>
-                                    } @else {
-                                      <span class="material-symbols-outlined review-pending" matTooltip="Requires review">schedule</span>
-                                    }
-                                  }
-                                </td>
-                              </ng-container>
                               <ng-container matColumnDef="date">
                                 <th mat-header-cell *matHeaderCellDef>Date</th>
                                 <td mat-cell *matCellDef="let b">{{ formatDate(b.date) }}</td>
@@ -284,16 +253,12 @@ import { getCurrencySymbol } from '../models/preferences.model';
     .full-width { width: 100%; }
     .page-intro { margin: 0 0 20px; max-width: 720px; line-height: 1.5; color: var(--mat-sys-on-surface-variant, #5f5f5f); font-size: 0.95rem; }
     .loading, .empty { padding: 24px; color: #757575; }
-    .conflict-icon { color: var(--mat-sys-error, #b00020); font-size: 20px; vertical-align: middle; margin-left: 4px; }
     .expand-col { width: 48px; }
     .expanded-cell { padding: 0; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,0.12); }
     .matching-bookings-wrap { padding: 12px 16px; background: rgba(0,0,0,0.02); }
     .matching-loading, .matching-empty { margin: 0; font-size: 0.9rem; color: var(--mat-sys-on-surface-variant, #666); }
     .inner-table { width: 100%; font-size: 0.9rem; }
     .inner-table .mat-mdc-header-cell, .inner-table .mat-mdc-cell { padding: 6px 12px; }
-    .review-col { width: 40px; }
-    .review-done { color: var(--mat-sys-primary, #1976d2); }
-    .review-pending { color: var(--mat-sys-error, #b00020); }
     .clickable-row { cursor: pointer; }
     .expandable-detail-row:not(.expandable-detail-row--open) { min-height: 0; height: 0; }
     .expandable-detail-row:not(.expandable-detail-row--open) .mat-mdc-cell { padding: 0; min-height: 0; height: 0; overflow: hidden; border-bottom-width: 0; }
@@ -308,7 +273,7 @@ export class BookingRulesComponent implements OnInit {
 
   rules: BookingRule[] = [];
   loading = false;
-  displayedColumns = ['expand', 'name', 'criteria', 'ledger', 'sortOrder', 'requiresReview', 'isActive', 'actions'];
+  displayedColumns = ['expand', 'name', 'criteria', 'ledger', 'requiresReview', 'isActive', 'actions'];
   systemDisplayedColumns = ['expand', 'name', 'criteria', 'ledger', 'isActive'];
 
   get userRules(): BookingRule[] {
@@ -318,7 +283,7 @@ export class BookingRulesComponent implements OnInit {
   get systemRules(): BookingRule[] {
     return this.rules.filter(r => r.isSystemGenerated);
   }
-  matchingBookingColumns = ['review', 'date', 'contraAccountName', 'description', 'amount'];
+  matchingBookingColumns = ['date', 'contraAccountName', 'description', 'amount'];
   expandedRuleId: number | null = null;
   private matchingBookingsCache = new Map<number, RuleMatchingBookingSummary[] | 'loading'>();
 
@@ -390,17 +355,6 @@ export class BookingRulesComponent implements OnInit {
   getCriteriaList(r: BookingRule): BookingRuleCriterion[] {
     if (r.criteria && r.criteria.length > 0) return r.criteria;
     return [{ matchField: r.matchField, matchOperator: r.matchOperator, matchValue: r.matchValue }];
-  }
-
-  hasConflicts(r: BookingRule): boolean {
-    return (r.conflictRuleIds?.length ?? 0) > 0;
-  }
-
-  getConflictTooltip(r: BookingRule): string {
-    const ids = r.conflictRuleIds ?? [];
-    if (ids.length === 0) return '';
-    const names = ids.map(id => this.rules.find(x => x.id === id)?.name ?? '#' + id).filter(Boolean);
-    return 'This rule shares at least one criterion with: ' + (names.join(', ') || 'other rule(s). More specific rules (more criteria) are applied first.');
   }
 
   toggleActive(rule: BookingRule, isActive: boolean): void {

@@ -179,11 +179,6 @@ interface LineItemRow {
 
         <!-- Options -->
         <div class="section options-section">
-          <mat-form-field appearance="outline" class="sort-order-field">
-            <mat-label>Sort order</mat-label>
-            <input matInput type="number" [(ngModel)]="form.sortOrder" name="sortOrder" min="0">
-            <mat-hint>Lower = checked first</mat-hint>
-          </mat-form-field>
           <mat-checkbox [(ngModel)]="form.requiresReview" name="requiresReview">Requires review</mat-checkbox>
         </div>
       </form>
@@ -214,7 +209,6 @@ interface LineItemRow {
     .criteria-note { margin: 6px 0 0; font-size: 0.8rem; color: var(--mat-sys-on-surface-variant, #666); }
     .line-items-note { margin: 8px 0 0; font-size: 0.8rem; color: var(--mat-sys-on-surface-variant, #666); }
     .options-section { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .sort-order-field { width: 120px; }
   `],
 })
 export class BookingRuleEditDialogComponent {
@@ -251,7 +245,6 @@ export class BookingRuleEditDialogComponent {
             { ledgerAccountId: r!.secondLedgerAccountId as number | null, amountType: 'Zero' as const },
           ]
         : [{ ledgerAccountId: (r?.ledgerAccountId ?? null) as number | null, amountType: (r ? 'OppositeOfLine1' : 'OppositeOfLine1') as 'OppositeOfLine1' | 'Zero' }] as LineItemRow[],
-      sortOrder: r?.sortOrder ?? 0,
       isActive: r?.isActive ?? true,
       requiresReview: r?.requiresReview ?? true,
     };
@@ -317,7 +310,6 @@ export class BookingRuleEditDialogComponent {
       matchValue: c.value?.trim() ?? '',
       ledgerAccountId: first.ledgerAccountId,
       secondLedgerAccountId: secondLedgerId,
-      sortOrder: Number(this.form.sortOrder) || 0,
       isActive: this.form.isActive ?? true,
       requiresReview: this.form.requiresReview ?? true,
     });

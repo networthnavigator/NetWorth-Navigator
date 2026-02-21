@@ -19,7 +19,7 @@ import { BookingsService } from '../services/bookings.service';
 import { LedgerAccount } from '../models/ledger-account.model';
 import { LedgerAccountSelectComponent } from '../components/ledger-account-select/ledger-account-select.component';
 
-export type ApplyRuleTo = '' | 'this' | 'pending' | 'all';
+export type ApplyRuleTo = '' | 'this' | 'all';
 
 interface CriterionRow {
   field: string;
@@ -82,7 +82,7 @@ export interface FromBookingPrefill {
                 @if (isEdit) {
                   <mat-checkbox [(ngModel)]="form.isActive" name="isActive" class="active-checkbox">Active</mat-checkbox>
                   <button type="button" mat-icon-button (click)="deleteRule()" matTooltip="Delete rule" class="delete-rule-btn">
-                    <mat-icon>delete</mat-icon>
+                    <span class="material-symbols-outlined">delete</span>
                   </button>
                 }
               </div>
@@ -151,19 +151,21 @@ export interface FromBookingPrefill {
             <!-- Line items -->
             <div class="section">
               <label class="section-label">Line items</label>
-              <p class="section-hint">What should be booked when the criteria are met? At least 1, multiple can be added.</p>
+              <p class="section-hint">What should be booked when the criteria are met? Line 1 is always the own-account ledger. Add contra lines below (2, 3, 4…).</p>
               <div class="table-wrap">
                 <table class="line-items-table">
                   <thead>
                     <tr>
+                      <th class="nr-col">Nr</th>
                       <th>Ledger</th>
                       <th>Amount</th>
                       <th class="col-action"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    @for (line of form.lineItems; track $index) {
+                    @for (line of form.lineItems; track $index; let i = $index) {
                       <tr>
+                        <td class="nr-col mono">{{ i + 2 }}</td>
                         <td>
                           <app-ledger-account-select
                             [accounts]="ledgerAccounts"
@@ -184,8 +186,14 @@ export interface FromBookingPrefill {
                           }
                         </td>
                         <td class="col-action">
+                          <button type="button" mat-icon-button (click)="moveLineItemUp(i)" [disabled]="i === 0" matTooltip="Move up">
+                            <span class="material-symbols-outlined">arrow_upward</span>
+                          </button>
+                          <button type="button" mat-icon-button (click)="moveLineItemDown(i)" [disabled]="i === form.lineItems.length - 1" matTooltip="Move down">
+                            <span class="material-symbols-outlined">arrow_downward</span>
+                          </button>
                           @if (form.lineItems.length > 1) {
-                            <button type="button" mat-icon-button (click)="removeLineItem($index)" matTooltip="Remove line item">
+                            <button type="button" mat-icon-button (click)="removeLineItem(i)" matTooltip="Remove line item">
                               <span class="material-symbols-outlined">delete</span>
                             </button>
                           }
@@ -195,11 +203,11 @@ export interface FromBookingPrefill {
                   </tbody>
                 </table>
               </div>
-              <button type="button" mat-stroked-button (click)="addLineItem()" class="add-btn" [disabled]="form.lineItems.length >= 2">
+              <button type="button" mat-stroked-button (click)="addLineItem()" class="add-btn">
                 <span class="material-symbols-outlined">add</span>
                 Add line item
               </button>
-              <p class="line-items-note">With 1 line item: contra of line 1. With 2 line items: both amounts 0 (e.g. interest + principal to fill in later).</p>
+              <p class="line-items-note">First line item: contra of line 1. Additional lines: amount 0 (e.g. interest + principal to fill in later).</p>
             </div>
 
             <!-- Apply to... (after save) -->
@@ -212,22 +220,16 @@ export interface FromBookingPrefill {
                   @if (prefillFromBooking?.documentLineId) {
                     <mat-option value="this">This booking (the transaction you came from)</mat-option>
                   }
-                  <mat-option value="pending">All pending (not yet approved) bookings</mat-option>
                   <mat-option value="all">All bookings</mat-option>
                   <mat-option value="">Don't apply now</mat-option>
                 </mat-select>
               </mat-form-field>
             </div>
 
-            <!-- Options -->
-            <div class="section options-section">
-              <mat-form-field appearance="outline" class="sort-order-field">
-                <mat-label>Sort order</mat-label>
-                <input matInput type="number" [(ngModel)]="form.sortOrder" name="sortOrder" min="0">
-                <mat-hint>Lower = checked first</mat-hint>
-              </mat-form-field>
-              <mat-checkbox [(ngModel)]="form.requiresReview" name="requiresReview">Requires review</mat-checkbox>
-            </div>
+        <!-- Options -->
+        <div class="section options-section">
+          <mat-checkbox [(ngModel)]="form.requiresReview" name="requiresReview">Requires review</mat-checkbox>
+        </div>
           </form>
         </mat-card-content>
         <mat-card-actions align="end">
@@ -254,6 +256,7 @@ export interface FromBookingPrefill {
     .criteria-table, .line-items-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     .criteria-table th, .criteria-table td, .line-items-table th, .line-items-table td { padding: 4px 8px; vertical-align: middle; }
     .criteria-table th, .line-items-table th { text-align: left; font-weight: 600; color: var(--mat-sys-on-surface-variant, #666); font-size: 0.75rem; text-transform: uppercase; }
+    .line-items-table .nr-col { width: 40px; text-align: right; }
     .col-action { width: 48px; text-align: right; }
     .col-action .material-symbols-outlined { font-size: 24px; }
     .cell-field { width: 100%; min-width: 140px; }
@@ -265,7 +268,6 @@ export interface FromBookingPrefill {
     .apply-section { }
     .apply-field { min-width: 320px; }
     .options-section { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .sort-order-field { width: 120px; }
     mat-card-actions { padding: 16px 24px; }
   `],
 })
@@ -347,20 +349,23 @@ export class BookingRuleFormComponent implements OnInit {
       ? r.criteria.map(c => ({ field: c.matchField, operator: c.matchOperator, value: c.matchValue }))
       : [{ field: r?.matchField ?? 'ContraAccountName', operator: r?.matchOperator ?? 'Contains', value: r?.matchValue ?? '' }];
     const first = criteriaList[0];
+    const apiLineItems = r?.lineItems;
     const hasSecond = (r?.secondLedgerAccountId ?? 0) > 0;
+    const lineItemsFromApi = apiLineItems && apiLineItems.length > 0
+      ? apiLineItems.map(li => ({ ledgerAccountId: li.ledgerAccountId as number | null, amountType: (li.amountType === 'Zero' ? 'Zero' : 'OppositeOfLine1') as 'OppositeOfLine1' | 'Zero' }))
+      : hasSecond && r
+        ? [
+            { ledgerAccountId: r.ledgerAccountId as number | null, amountType: 'Zero' as const },
+            { ledgerAccountId: r.secondLedgerAccountId as number | null, amountType: 'Zero' as const },
+          ]
+        : [{ ledgerAccountId: (r?.ledgerAccountId ?? null) as number | null, amountType: 'OppositeOfLine1' as const }];
     return {
       name: r?.name ?? '',
       criteria: criteriaList as CriterionRow[],
       matchField: first?.field ?? 'ContraAccountName',
       matchOperator: first?.operator ?? 'Contains',
       matchValue: first?.value ?? '',
-      lineItems: hasSecond && r
-        ? [
-            { ledgerAccountId: r.ledgerAccountId as number | null, amountType: 'Zero' as const },
-            { ledgerAccountId: r.secondLedgerAccountId as number | null, amountType: 'Zero' as const },
-          ]
-        : [{ ledgerAccountId: (r?.ledgerAccountId ?? null) as number | null, amountType: 'OppositeOfLine1' as const }] as LineItemRow[],
-      sortOrder: r?.sortOrder ?? 0,
+      lineItems: lineItemsFromApi as LineItemRow[],
       isActive: r?.isActive ?? true,
       requiresReview: r?.requiresReview ?? true,
       applyTo: '' as ApplyRuleTo,
@@ -392,13 +397,24 @@ export class BookingRuleFormComponent implements OnInit {
   }
 
   addLineItem(): void {
-    if (this.form.lineItems.length >= 2) return;
     this.form.lineItems.push({ ledgerAccountId: null, amountType: 'Zero' });
   }
 
   removeLineItem(index: number): void {
     if (this.form.lineItems.length <= 1) return;
     this.form.lineItems.splice(index, 1);
+  }
+
+  moveLineItemUp(index: number): void {
+    if (index <= 0) return;
+    const arr = this.form.lineItems;
+    [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]];
+  }
+
+  moveLineItemDown(index: number): void {
+    if (index >= this.form.lineItems.length - 1) return;
+    const arr = this.form.lineItems;
+    [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]];
   }
 
   cancel(): void {
@@ -432,13 +448,14 @@ export class BookingRuleFormComponent implements OnInit {
     if (!this.form.criteria.length || !this.form.name?.trim()) return;
     const first = this.form.lineItems[0];
     if (!first?.ledgerAccountId) return;
-    const second = this.form.lineItems[1];
-    const secondLedgerId = second?.ledgerAccountId && second.ledgerAccountId > 0 ? second.ledgerAccountId : undefined;
     const criteria = this.form.criteria.map(c => ({
       matchField: c.field,
       matchOperator: c.operator,
       matchValue: c.value?.trim() ?? '',
     }));
+    const lineItems = this.form.lineItems
+      .filter(li => li.ledgerAccountId != null && li.ledgerAccountId > 0)
+      .map(li => ({ ledgerAccountId: li.ledgerAccountId!, amountType: li.amountType }));
     const payload = {
       name: this.form.name.trim(),
       criteria,
@@ -446,29 +463,20 @@ export class BookingRuleFormComponent implements OnInit {
       matchOperator: criteria[0]?.matchOperator ?? 'Contains',
       matchValue: criteria[0]?.matchValue ?? '',
       ledgerAccountId: first.ledgerAccountId,
-      secondLedgerAccountId: secondLedgerId,
-      sortOrder: Number(this.form.sortOrder) || 0,
+      secondLedgerAccountId: this.form.lineItems[1]?.ledgerAccountId && this.form.lineItems[1].ledgerAccountId > 0 ? this.form.lineItems[1].ledgerAccountId : undefined,
+      lineItems: lineItems.length > 0 ? lineItems : undefined,
       isActive: this.form.isActive ?? true,
       requiresReview: this.form.requiresReview ?? true,
     };
 
     this.saving = true;
-    const showConflictWarning = (res: { conflictRuleIds?: number[] }) => {
-      if (res.conflictRuleIds && res.conflictRuleIds.length > 0) {
-        this.snackBar.open(
-          'Rule saved. It shares criteria with other rule(s). More specific rules (more criteria) are applied first.',
-          undefined,
-          { duration: 5000 }
-        );
-      }
-    };
     const doAfterSave = () => {
       const applyTo = (this.form.applyTo ?? '') as ApplyRuleTo;
       if (!applyTo) {
         this.router.navigate(this.prefillFromBooking ? ['/bookings'] : ['/booking-rules']);
         return;
       }
-      const scope = applyTo === 'this' ? 'ThisBooking' : applyTo === 'pending' ? 'PendingOnly' : 'All';
+      const scope = applyTo === 'this' ? 'ThisBooking' : 'All';
       const docLineId = applyTo === 'this' && this.prefillFromBooking?.documentLineId ? this.prefillFromBooking.documentLineId : undefined;
       this.bookingsService.recreateByScope(scope, docLineId).subscribe({
         next: (result) => {
@@ -488,7 +496,6 @@ export class BookingRuleFormComponent implements OnInit {
         next: (res) => {
           this.saving = false;
           this.snackBar.open('Rule updated', undefined, { duration: 2000 });
-          showConflictWarning(res);
           doAfterSave();
         },
         error: (err) => {
@@ -501,7 +508,6 @@ export class BookingRuleFormComponent implements OnInit {
         next: (res) => {
           this.saving = false;
           this.snackBar.open('Rule added', undefined, { duration: 2000 });
-          showConflictWarning(res);
           doAfterSave();
         },
         error: (err) => {

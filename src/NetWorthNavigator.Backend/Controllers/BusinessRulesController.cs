@@ -34,6 +34,7 @@ public class BusinessRulesController : ControllerBase
         {
             var criteria = BusinessRuleCriteria.GetCriteria(r).Select(c => new { matchField = c.MatchField, matchOperator = c.MatchOperator, matchValue = c.MatchValue }).ToList();
             var conflictRuleIds = conflictMap.TryGetValue(r.Id, out var ids) ? ids : Array.Empty<int>();
+            var lineItems = BusinessRuleLineItems.GetLineItems(r).Select(li => new { ledgerAccountId = li.LedgerAccountId, amountType = li.AmountType }).ToList();
             return (object)new
             {
                 r.Id,
@@ -49,6 +50,7 @@ public class BusinessRulesController : ControllerBase
                 r.SecondLedgerAccountId,
                 SecondLedgerAccountCode = r.SecondLedgerAccount?.Code,
                 SecondLedgerAccountName = r.SecondLedgerAccount?.Name,
+                lineItems,
                 r.SortOrder,
                 r.IsActive,
                 r.RequiresReview,
@@ -169,8 +171,21 @@ public class BusinessRulesController : ControllerBase
             rule.IsActive = request.IsActive.Value;
         if (request.RequiresReview.HasValue)
             rule.RequiresReview = request.RequiresReview.Value;
-        if (request.SecondLedgerAccountId.HasValue)
+        if (request.LineItems != null)
+        {
+            var valid = request.LineItems.Where(li => li.LedgerAccountId > 0).ToList();
+            if (valid.Count > 0)
+            {
+                rule.LineItemsJson = JsonSerializer.Serialize(valid.Select(li => new { ledgerAccountId = li.LedgerAccountId, amountType = li.AmountType ?? "OppositeOfLine1" }), JsonOptions);
+                rule.LedgerAccountId = valid[0].LedgerAccountId;
+                rule.SecondLedgerAccountId = valid.Count > 1 ? valid[1].LedgerAccountId : null;
+            }
+        }
+        else if (request.SecondLedgerAccountId.HasValue)
+        {
             rule.SecondLedgerAccountId = request.SecondLedgerAccountId.Value > 0 ? request.SecondLedgerAccountId.Value : null;
+            rule.LineItemsJson = null;
+        }
         await _context.SaveChangesAsync(ct);
         await _context.Entry(rule).Reference(r => r.LedgerAccount).LoadAsync(ct);
         await _context.Entry(rule).Reference(r => r.SecondLedgerAccount).LoadAsync(ct);
@@ -216,6 +231,16 @@ public class BusinessRulesController : ControllerBase
             RequiresReview = request.RequiresReview,
         };
         ApplyCriteriaToRule(rule, request.Criteria, request.MatchField, request.MatchOperator, request.MatchValue);
+        if (request.LineItems != null && request.LineItems.Count > 0)
+        {
+            var valid = request.LineItems.Where(li => li.LedgerAccountId > 0).ToList();
+            if (valid.Count > 0)
+            {
+                rule.LineItemsJson = JsonSerializer.Serialize(valid.Select(li => new { ledgerAccountId = li.LedgerAccountId, amountType = li.AmountType ?? "OppositeOfLine1" }), JsonOptions);
+                rule.LedgerAccountId = valid[0].LedgerAccountId;
+                rule.SecondLedgerAccountId = valid.Count > 1 ? valid[1].LedgerAccountId : null;
+            }
+        }
         _context.BusinessRules.Add(rule);
         await _context.SaveChangesAsync(ct);
         await _context.Entry(rule).Reference(r => r.LedgerAccount).LoadAsync(ct);
@@ -254,6 +279,12 @@ public class CriterionRequest
     public string? MatchValue { get; set; }
 }
 
+public class LineItemRequest
+{
+    public int LedgerAccountId { get; set; }
+    public string AmountType { get; set; } = "OppositeOfLine1"; // "OppositeOfLine1" | "Zero"
+}
+
 public class CreateBusinessRuleRequest
 {
     public string Name { get; set; } = string.Empty;
@@ -265,6 +296,8 @@ public class CreateBusinessRuleRequest
     public int LedgerAccountId { get; set; }
     /// <summary>Optional second ledger (e.g. 0773); when set, two contra lines with amount 0 are created.</summary>
     public int? SecondLedgerAccountId { get; set; }
+    /// <summary>When set, full list of line items (overrides LedgerAccountId+SecondLedgerAccountId). Order preserved.</summary>
+    public List<LineItemRequest>? LineItems { get; set; }
     public int SortOrder { get; set; }
     /// <summary>If true, bookings created with this rule need user review before approved. Default true for contra rules.</summary>
     public bool RequiresReview { get; set; } = true;
@@ -279,6 +312,7 @@ public class UpdateBusinessRuleRequest
     public List<CriterionRequest>? Criteria { get; set; }
     public int? LedgerAccountId { get; set; }
     public int? SecondLedgerAccountId { get; set; }
+    public List<LineItemRequest>? LineItems { get; set; }
     public int? SortOrder { get; set; }
     public bool? IsActive { get; set; }
     public bool? RequiresReview { get; set; }

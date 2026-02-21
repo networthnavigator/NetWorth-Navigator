@@ -29,10 +29,12 @@ import { LedgerAccount } from '../../models/ledger-account.model';
         (optionSelected)="onOptionSelected($event)">
         @for (la of filteredOptions(); track la.id) {
           <mat-option [value]="la">
-            <span class="option-main">{{ la.code }} {{ la.name }}</span>
-            @if (la.accountStructurePath) {
-              <span class="option-context">{{ la.accountStructurePath }}</span>
-            }
+            <div class="option-content">
+              <span class="option-main">{{ la.code }} {{ la.name }}</span>
+              @if (la.accountStructurePath) {
+                <span class="option-context">{{ la.accountStructurePath }}</span>
+              }
+            </div>
           </mat-option>
         }
       </mat-autocomplete>
@@ -43,9 +45,19 @@ import { LedgerAccount } from '../../models/ledger-account.model';
   `,
   styles: [`
     .full-width { width: 100%; }
-    mat-option { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+    mat-option .option-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      width: 100%;
+    }
     .option-main { font-weight: 500; }
-    .option-context { font-size: 0.8em; color: var(--mat-sys-on-surface-variant, #666); }
+    .option-context {
+      display: block;
+      font-size: 0.8em;
+      color: var(--mat-sys-on-surface-variant, #666);
+    }
   `],
 })
 export class LedgerAccountSelectComponent {
@@ -76,11 +88,9 @@ export class LedgerAccountSelectComponent {
     return sorted.filter(searchable);
   });
 
-  /** Display text for a ledger account (code + name, optionally with path for context). */
+  /** Display text in input field after selection: only code + name (most valuable info). Path stays in dropdown for context. */
   private static displayText(la: LedgerAccount): string {
-    const main = `${la.code} ${la.name}`.trim();
-    if (la.accountStructurePath?.trim()) return `${main} (${la.accountStructurePath})`;
-    return main;
+    return `${la.code ?? ''} ${la.name ?? ''}`.trim();
   }
 
   constructor() {

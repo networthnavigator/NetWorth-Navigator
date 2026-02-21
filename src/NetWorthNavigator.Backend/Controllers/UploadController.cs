@@ -26,7 +26,7 @@ public class UploadController : ControllerBase
             new { id = "ExternalId", label = "External ID (bank transaction ID, for deduplication)" },
             new { id = "Amount", label = "Amount" },
             new { id = "_AmountSign", label = "Debit/Credit" },
-            new { id = "Description", label = "Description (e.g. Mededelingen)" },
+            new { id = "Description", label = "Description" },
             new { id = "BalanceAfter", label = "Balance after" },
             new { id = "Currency", label = "Currency" },
             new { id = "MovementType", label = "Movement type (code)" },
